@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "AWS AI Practitioner",
+    "slug": "aws-ai-practitioner-quiz",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#232F3E"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "plugins": ["expo-notifications"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.awsquiz.aifpractitioner",
+      "infoPlist": {
+        "NSUserNotificationsUsageDescription": "We use notifications to remind you to study and alert you before your exam date."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#232F3E"
+      },
+      "package": "com.awsquiz.aifpractitioner",
+      "versionCode": 1,
+      "targetSdkVersion": 34,
+      "compileSdkVersion": 34,
+      "permissions": [
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK",
+        "android.permission.POST_NOTIFICATIONS"
+      ]
+    }
+  }
+}
