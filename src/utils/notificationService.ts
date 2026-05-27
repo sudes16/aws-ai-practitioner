@@ -6,13 +6,15 @@ let Notifications: typeof import('expo-notifications') | null = null;
 if (Platform.OS !== 'web') {
   Notifications = require('expo-notifications');
   // Register handler once at module init — must happen before any scheduling
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-    }),
-  });
+  if (Notifications) {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
+    });
+  }
 }
 
 const STORAGE_KEY = 'studyReminder';

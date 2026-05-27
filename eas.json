@@ -8,16 +8,14 @@
         "buildType": "apk"
       },
       "ios": {
-        "buildType": "release"
+        "simulator": true
       }
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
       },
-      "ios": {
-        "buildType": "release"
-      }
+      "ios": {}
     }
   },
   "submit": {
