@@ -16,7 +16,17 @@
     ],
     "plugins": [
       "expo-notifications",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "buildToolsVersion": "35.0.0"
+          }
+        }
+      ]
     ],
     "ios": {
       "supportsTablet": true,
@@ -31,7 +41,7 @@
         "backgroundColor": "#232F3E"
       },
       "package": "com.awsquiz.aifpractitioner",
-      "versionCode": 3,
+      "versionCode": 4,
       "targetSdkVersion": 35,
       "compileSdkVersion": 35,
       "permissions": [
