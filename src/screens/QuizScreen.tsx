@@ -19,13 +19,13 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList, HistoryEntry, Question, OptionState } from '../constants/types';
 import { getAllQuestions, parseCorrectLetters } from '../utils/quizEngine';
 import { setExamResult } from '../utils/examResultStore';
-import { saveNoteForQuestion, getAllNotes } from '../utils/noteStore';
 import { addQuestionReport, QuestionReport } from '../utils/storage';
 import { updateSRRecord } from '../utils/spacedRepetition';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../contexts/ThemeContext';
 import { ColorScheme } from '../constants/colors';
 import { cssVal, shadow, noShadow } from '../utils/styleUtils';
+import { useNotes } from '../contexts/NotesContext';
 import ProgressBar from '../components/ProgressBar';
 import OptionButton from '../components/OptionButton';
 import ExplanationModal from '../components/ExplanationModal';
@@ -36,6 +36,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Quiz'>;
 export default function QuizScreen({ navigation, route }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { notesMap, saveNote } = useNotes();
 
   const { config } = route.params;
   const isExam = config.isExam ?? false;
@@ -60,6 +61,8 @@ export default function QuizScreen({ navigation, route }: Props) {
   const hotspotSelectionsRef = useRef<string[]>([]);
   hotspotSelectionsRef.current = hotspotSelections;
 
+  const scrollRef = useRef<ScrollView>(null);
+
   // Stable ref so the timer effect doesn't restart when selectedLetters changes
   const doSubmitRef = useRef<(forced?: boolean) => void>(() => {});
 
@@ -70,7 +73,6 @@ export default function QuizScreen({ navigation, route }: Props) {
   const [flagged, setFlagged] = useState<Set<number>>(new Set());
 
   // Notes & Reports
-  const [notesMap, setNotesMap] = useState<Record<number, string>>({});
   const [showNoteSheet, setShowNoteSheet] = useState(false);
   const [noteInput, setNoteInput] = useState('');
   const [reportedSet, setReportedSet] = useState<Set<number>>(new Set());
@@ -79,19 +81,25 @@ export default function QuizScreen({ navigation, route }: Props) {
   const [reportNote, setReportNote] = useState('');
   const [reportSaved, setReportSaved] = useState(false);
 
-  // Load notes on mount
-  useEffect(() => { getAllNotes().then(setNotesMap); }, []);
+  // Load notes on mount — handled by NotesContext
 
   // Modals
   const [showExplanation, setShowExplanation] = useState(false);
+  const [showExplanationPrompt, setShowExplanationPrompt] = useState(false);
   const [showEndModal, setShowEndModal] = useState(false);
+  // Review banner: only show when user deliberately navigated back via Prev (not on auto-advance)
+  const [manualReviewActive, setManualReviewActive] = useState(false);
   const [examTimeLeft, setExamTimeLeft] = useState(isExam ? EXAM_TOTAL : 0);
   const examTimeLeftRef = useRef(isExam ? EXAM_TOTAL : 0);
   const [showExamReview, setShowExamReview] = useState(false);
+  const [examReviewFilters, setExamReviewFilters] = useState<Set<string>>(new Set());
   const [showExamConfirm, setShowExamConfirm] = useState(false);
   const [showSkipConfirm, setShowSkipConfirm] = useState(false);
-  // Exam mode: unlocks the Questions panel once user has visited the last question
-  const [hasReachedEnd, setHasReachedEnd] = useState(false);
+  const [examWarning, setExamWarning] = useState<string | null>(null);
+  const examWarningFiredRef = useRef<Set<number>>(new Set());
+  const [showJumper, setShowJumper] = useState(false);
+  const [jumperInput, setJumperInput] = useState('');
+  // Exam mode: unlocks Review once Q65 has been answered (not just visited)
   // Exam mode: draft answers keyed by question position (0-based), saved as user selects
   const [examDraftAnswers, setExamDraftAnswers] = useState<Record<number, string[]>>({});
 
@@ -185,12 +193,13 @@ export default function QuizScreen({ navigation, route }: Props) {
                 }
              }, 1500);
           } else {
-             setShowExplanation(true);
+             // Study mode timeout — wrong by definition, prompt for explanation
+             if (q.explanation) setShowExplanationPrompt(true);
           }
           return;
         }
 
-        if (config.studyMode) setShowExplanation(true);
+        if (config.studyMode && !isCorrect && q.explanation) setShowExplanationPrompt(true);
         if (config.mode === 'spaced') updateSRRecord(q.number, isCorrect ? 4 : 1).catch(() => {});
         return;
       }
@@ -247,7 +256,7 @@ export default function QuizScreen({ navigation, route }: Props) {
         return;
       }
 
-      if (config.studyMode && q.explanation) setShowExplanation(true);
+      if (config.studyMode && q.explanation && isCorrect !== true) setShowExplanationPrompt(true);
       if (config.mode === 'spaced' && isCorrect !== null) {
         updateSRRecord(q.number, isCorrect ? 4 : 1).catch(() => {});
       }
@@ -326,10 +335,18 @@ export default function QuizScreen({ navigation, route }: Props) {
     }
   }, [viewPos, config.timed, config.timePerQuestion, history.length]);
 
-  // Close explanation modal when navigating between questions
+  // Close explanation modal/prompt and reset scroll position when navigating between questions
   useEffect(() => {
     setShowExplanation(false);
+    setShowExplanationPrompt(false);
+    scrollRef.current?.scrollTo({ x: 0, y: 0, animated: false });
   }, [viewPos]);
+
+  // Reset review banner when user navigates forward back to their current question
+  useEffect(() => {
+    if (!isExam && viewPos >= currentPos) setManualReviewActive(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewPos, currentPos]);
 
   // Exam mode: global 90-min countdown — auto-submit when time runs out
   useEffect(() => {
@@ -337,6 +354,13 @@ export default function QuizScreen({ navigation, route }: Props) {
     if (examTimeLeft <= 0) {
       submitExamRef.current();
       return;
+    }
+    // Fire warnings at 10 min (600s) and 5 min (300s) remaining — only once each
+    if ((examTimeLeft === 600 || examTimeLeft === 300) && !examWarningFiredRef.current.has(examTimeLeft)) {
+      examWarningFiredRef.current.add(examTimeLeft);
+      const mins = examTimeLeft / 60;
+      setExamWarning(`⏰ ${mins} minutes remaining!`);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     }
     const t = setTimeout(() => setExamTimeLeft(e => e - 1), 1000);
     return () => clearTimeout(t);
@@ -362,9 +386,16 @@ export default function QuizScreen({ navigation, route }: Props) {
   // Also unlock the Questions panel once the user reaches the last question
   useEffect(() => {
     if (!isExam) return;
-    setSelectedLetters(examDraftAnswers[viewPos] ?? []);
-    setHotspotSelections([]);
-    if (viewPos === totalQuestions - 1) setHasReachedEnd(true);
+    const idx = config.indices[viewPos];
+    const q = questions[idx];
+    const isHotspotQ = q?.is_hotspot && q?.answer?.length > 0 && Object.keys(q?.options ?? {}).length > 0;
+    if (isHotspotQ) {
+      setHotspotSelections(examDraftAnswers[viewPos] ?? []);
+      setSelectedLetters([]);
+    } else {
+      setSelectedLetters(examDraftAnswers[viewPos] ?? []);
+      setHotspotSelections([]);
+    }
   // intentional: isExam, totalQuestions, and examDraftAnswers are stable across the
   // exam lifecycle; reading them here always gives the current snapshot.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -471,13 +502,7 @@ export default function QuizScreen({ navigation, route }: Props) {
   const handleNoteSave = async () => {
     if (!displayQuestion) return;
     const qNum = displayQuestion.number;
-    await saveNoteForQuestion(qNum, noteInput);
-    setNotesMap(prev => {
-      const next = { ...prev };
-      if (noteInput.trim()) next[qNum] = noteInput.trim();
-      else delete next[qNum];
-      return next;
-    });
+    await saveNote(qNum, noteInput);
     setShowNoteSheet(false);
   };
 
@@ -527,6 +552,7 @@ export default function QuizScreen({ navigation, route }: Props) {
       total: totalQuestions,
       score: scoreRef.current,
       quit,
+      config,
     });
   };
 
@@ -553,7 +579,16 @@ export default function QuizScreen({ navigation, route }: Props) {
   const hasNote = !!notesMap[displayQuestion.number];
   const isReported = reportedSet.has(displayQuestion.number);
   const canGoPrev = viewPos > 0;
-  const canGoNext = isExam ? viewPos < totalQuestions - 1 : viewPos < currentPos;
+  // In exam mode Next is always enabled: on the last question it opens Review instead of advancing
+  const canGoNext = isExam ? true : viewPos < currentPos;
+  // Review unlocks once Q65 has an answer saved (works for both regular and hotspot questions)
+  const canReview = isExam && (examDraftAnswers[totalQuestions - 1]?.length ?? 0) > 0;
+  // Exam review filter helpers
+  const reviewAnsweredCount = Object.values(examDraftAnswers).filter(a => a.length > 0).length;
+  const reviewNotedCount = config.indices.filter(idx => idx !== undefined && !!notesMap[questions[idx]?.number]?.trim()).length;
+  const reviewRemainingCount = totalQuestions - reviewAnsweredCount;
+  const toggleReviewFilter = (f: string) =>
+    setExamReviewFilters(prev => { const n = new Set(prev); n.has(f) ? n.delete(f) : n.add(f); return n; });
   const isCurrentQ = viewPos === currentPos;
   // Structured hotspot: Submit enabled only when every step has a selection
   const isStructuredHotspot =
@@ -637,11 +672,25 @@ export default function QuizScreen({ navigation, route }: Props) {
       <View style={styles.metaRow}>
         {/* Top line: Q counter + Score */}
         <View style={styles.metaTopRow}>
-          <Text style={styles.qCounter}>
-            Q {viewPos + 1}
-            <Text style={styles.qCounterSub}> / {totalQuestions}</Text>
-            <Text style={styles.qCounterRef}>  #{displayQuestion.number}</Text>
-          </Text>
+          {isExam ? (
+            <Text style={styles.qCounter}>
+              Q {viewPos + 1}
+              <Text style={styles.qCounterSub}> / {totalQuestions}</Text>
+              <Text style={styles.qCounterRef}>  #{displayQuestion.number}</Text>
+            </Text>
+          ) : (
+            <TouchableOpacity
+              onPress={() => { setJumperInput(''); setShowJumper(true); }}
+              accessibilityLabel="Jump to question"
+              accessibilityRole="button"
+            >
+              <Text style={styles.qCounter}>
+                Q {viewPos + 1}
+                <Text style={styles.qCounterSub}> / {totalQuestions}</Text>
+                <Text style={styles.qCounterRef}>  #{displayQuestion.number}</Text>
+              </Text>
+            </TouchableOpacity>
+          )}
           {!isExam && (
             <Text style={styles.scoreText}>
               Score: {score}/{currentPos}
@@ -688,11 +737,11 @@ export default function QuizScreen({ navigation, route }: Props) {
         </View>
       </View>
 
-      {/* ── Review banner (when looking at a past question) ── */}
-      {isReviewingPast && (
+      {/* ── Review banner (when user deliberately navigated back to a past question) ── */}
+      {!isExam && manualReviewActive && (
         <TouchableOpacity
           style={styles.reviewBanner}
-          onPress={() => setViewPos(currentPos)}
+          onPress={() => setViewPos(Math.min(currentPos, totalQuestions - 1))}
         >
           <Text style={styles.reviewBannerText}>
             📋 Review Mode | Tap to return to current question
@@ -702,6 +751,7 @@ export default function QuizScreen({ navigation, route }: Props) {
 
       {/* ── Main Scrollable Content ── */}
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -737,7 +787,12 @@ export default function QuizScreen({ navigation, route }: Props) {
                     : undefined
                 }
                 selections={hotspotSelections}
-                onSelectionsChange={setHotspotSelections}
+                onSelectionsChange={(sels) => {
+                  setHotspotSelections(sels);
+                  if (isExam) {
+                    setExamDraftAnswers(d => ({ ...d, [viewPos]: sels }));
+                  }
+                }}
                 submitted={submitted}
                 isReviewing={isReviewingPast}
                 reviewSelections={reviewEntry?.userLetters}
@@ -814,8 +869,8 @@ export default function QuizScreen({ navigation, route }: Props) {
           </View>
         )}
 
-        {/* ── Explanation Button ── */}
-        {showFeedback && displayQuestion.explanation && (
+        {/* ── Explanation Button (study mode only) ── */}
+        {showFeedback && config.studyMode && displayQuestion.explanation && (
           <TouchableOpacity
             style={styles.explBtn}
             onPress={() => setShowExplanation(true)}
@@ -832,7 +887,7 @@ export default function QuizScreen({ navigation, route }: Props) {
         {/* Previous */}
         <TouchableOpacity
           style={[styles.navBtn, !canGoPrev && styles.navBtnDisabled]}
-          onPress={() => setViewPos(v => v - 1)}
+          onPress={() => { setViewPos(v => v - 1); if (!isExam) setManualReviewActive(true); }}
           disabled={!canGoPrev}
         >
           <Text style={[styles.navBtnText, !canGoPrev && styles.navBtnTextDisabled]}>
@@ -843,19 +898,20 @@ export default function QuizScreen({ navigation, route }: Props) {
         {isExam ? (
           /* ── Exam mode: Questions (center) — unlocks after reaching last question ── */
           <TouchableOpacity
-            style={[styles.endBtnExam, !hasReachedEnd && styles.navBtnDisabled]}
-            onPress={() => hasReachedEnd && setShowExamReview(true)}
-            disabled={!hasReachedEnd}
+            style={[styles.endBtnExam, !canReview && styles.navBtnDisabled]}
+            onPress={() => canReview && setShowExamReview(true)}
+            disabled={!canReview}
           >
-            <Text style={[styles.endBtnExamText, !hasReachedEnd && styles.navBtnTextDisabled]}>Review</Text>
+            <Text style={[styles.endBtnExamText, !canReview && styles.navBtnTextDisabled]}>Review</Text>
           </TouchableOpacity>
         ) : (
           /* ── Practice mode: End (center) ── */
           <TouchableOpacity
-            style={styles.endBtn}
+            style={[styles.endBtn, viewPos === totalQuestions - 1 && styles.navBtnDisabled]}
             onPress={() => setShowEndModal(true)}
+            disabled={viewPos === totalQuestions - 1}
           >
-            <Text style={styles.endBtnText}>Quit</Text>
+            <Text style={[styles.endBtnText, viewPos === totalQuestions - 1 && styles.navBtnTextDisabled]}>Quit</Text>
           </TouchableOpacity>
         )}
 
@@ -864,9 +920,14 @@ export default function QuizScreen({ navigation, route }: Props) {
           <TouchableOpacity
             style={[styles.navBtn, !canGoNext && styles.navBtnDisabled]}
             onPress={() => {
-              const hasAnswer = (examDraftAnswers[viewPos]?.length ?? 0) > 0;
+              const isLastQuestion = viewPos === totalQuestions - 1;
+              const hasAnswer = isStructuredHotspot
+                ? hotspotSelections.length > 0 && hotspotSelections.every(s => s !== '')
+                : (examDraftAnswers[viewPos]?.length ?? 0) > 0;
               if (!hasAnswer) {
-                setShowSkipConfirm(true);
+                setShowSkipConfirm(true); // dialog handles last-question case too
+              } else if (isLastQuestion) {
+                setShowExamReview(true);  // answered last question → open Review
               } else {
                 setViewPos(v => v + 1);
               }
@@ -938,6 +999,107 @@ export default function QuizScreen({ navigation, route }: Props) {
           .join('\n')}
       />
 
+      {/* ── Explanation Prompt (study mode: wrong answer) ── */}
+      <Modal
+        visible={showExplanationPrompt}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowExplanationPrompt(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>📚 Explanation Available</Text>
+            <Text style={styles.modalBody}>
+              Your answer was incorrect. Would you like to review the explanation?
+            </Text>
+            <View style={styles.modalBtns}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnSecondary]}
+                onPress={() => setShowExplanationPrompt(false)}
+              >
+                <Text style={styles.modalBtnSecText}>Skip</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnDanger]}
+                onPress={() => { setShowExplanationPrompt(false); setShowExplanation(true); }}
+              >
+                <Text style={styles.modalBtnDangerText}>View Explanation</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Exam Time Warning Modal ─────────────────────────────────────────── */}
+      <Modal
+        visible={examWarning !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setExamWarning(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={[styles.modalTitle, { color: colors.awsOrange }]}>{examWarning ?? ''}</Text>
+            <Text style={styles.modalBody}>Keep going — you can do this!</Text>
+            <View style={styles.modalBtns}>
+              <TouchableOpacity
+                style={[styles.modalBtn, { flex: 1, backgroundColor: colors.awsDark }]}
+                onPress={() => setExamWarning(null)}
+              >
+                <Text style={styles.modalBtnDangerText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Question Jumper Modal ──────────────────────────────────────────── */}
+      <Modal
+        visible={showJumper}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowJumper(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Go to Question</Text>
+            <Text style={styles.modalBody}>Enter a number between 1 and {totalQuestions}:</Text>
+            <TextInput
+              style={[styles.noteInput, { marginBottom: 12, textAlign: 'center' }]}
+              keyboardType="number-pad"
+              value={jumperInput}
+              onChangeText={setJumperInput}
+              placeholder={`1 – ${totalQuestions}`}
+              placeholderTextColor="#999"
+              maxLength={3}
+              autoFocus
+            />
+            <View style={styles.modalBtns}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnSecondary]}
+                onPress={() => setShowJumper(false)}
+              >
+                <Text style={styles.modalBtnSecText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: colors.awsDark }]}
+                onPress={() => {
+                  const n = parseInt(jumperInput, 10);
+                  if (!isNaN(n) && n >= 1 && n <= totalQuestions) {
+                    const target = n - 1;
+                    if (target < currentPos) setManualReviewActive(true);
+                    setViewPos(target);
+                    setShowJumper(false);
+                  }
+                }}
+              >
+                <Text style={styles.modalBtnDangerText}>Go</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* ── Time's Up Modal ────────────────────────────────────────────────── */}
       <Modal visible={showTimeoutModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
@@ -970,20 +1132,40 @@ export default function QuizScreen({ navigation, route }: Props) {
           <View style={styles.examReviewPanel}>
             <Text style={styles.examReviewTitle}>Review Exam</Text>
 
-            {/* Stats summary */}
-            <View style={styles.examReviewStats}>
-              <Text style={[styles.examReviewStat, { color: colors.correct }]}>
-                ✓ {Object.values(examDraftAnswers).filter(a => a.length > 0).length} answered
-              </Text>
-              <Text style={[styles.examReviewStat, { color: colors.awsOrange }]}>
-                ⚑ {flagged.size} flagged
-              </Text>
-              <Text style={[styles.examReviewStat, { color: colors.textMuted }]}>
-                ✎ {config.indices.filter(idx => idx !== undefined && !!notesMap[questions[idx]?.number]?.trim()).length} noted
-              </Text>
-              <Text style={[styles.examReviewStat, { color: colors.textMuted }]}>
-                □ {totalQuestions - Object.values(examDraftAnswers).filter(a => a.length > 0).length} remaining
-              </Text>
+            {/* Filter chips */}
+            <View style={styles.examFilterRow}>
+              <TouchableOpacity
+                style={[styles.examFilterChip, examReviewFilters.size === 0 && { borderColor: colors.awsDark, backgroundColor: colors.awsDark + '18' }]}
+                onPress={() => setExamReviewFilters(new Set())}
+              >
+                <Text style={[styles.examFilterChipText, { color: examReviewFilters.size === 0 ? colors.awsDark : colors.textSecondary }]}>
+                  All {totalQuestions}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.examFilterChip, examReviewFilters.has('answered') && { borderColor: colors.correct, backgroundColor: colors.correctBg }]}
+                onPress={() => toggleReviewFilter('answered')}
+              >
+                <Text style={[styles.examFilterChipText, { color: colors.correct }]}>✓ {reviewAnsweredCount} answered</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.examFilterChip, examReviewFilters.has('flagged') && { borderColor: colors.awsOrange, backgroundColor: colors.awsOrange + '18' }]}
+                onPress={() => toggleReviewFilter('flagged')}
+              >
+                <Text style={[styles.examFilterChipText, { color: colors.awsOrange }]}>⚑ {flagged.size} flagged</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.examFilterChip, examReviewFilters.has('noted') && { borderColor: colors.btnSecondary, backgroundColor: colors.optionSelected }]}
+                onPress={() => toggleReviewFilter('noted')}
+              >
+                <Text style={[styles.examFilterChipText, { color: colors.btnSecondary }]}>✎ {reviewNotedCount} noted</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.examFilterChip, examReviewFilters.has('remaining') && { borderColor: colors.textSecondary, backgroundColor: colors.background }]}
+                onPress={() => toggleReviewFilter('remaining')}
+              >
+                <Text style={[styles.examFilterChipText, { color: colors.textSecondary }]}>□ {reviewRemainingCount} remaining</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Question grid */}
@@ -999,6 +1181,12 @@ export default function QuizScreen({ navigation, route }: Props) {
                 const hasAnswer = (examDraftAnswers[i]?.length ?? 0) > 0;
                 const isFlaggedQ = q ? flagged.has(q.number) : false;
                 const hasNote = q ? !!notesMap[q.number]?.trim() : false;
+                const matchesFilters =
+                  examReviewFilters.size === 0 ||
+                  ((!examReviewFilters.has('answered') || hasAnswer) &&
+                   (!examReviewFilters.has('remaining') || !hasAnswer) &&
+                   (!examReviewFilters.has('flagged') || isFlaggedQ) &&
+                   (!examReviewFilters.has('noted') || hasNote));
                 return (
                   <TouchableOpacity
                     key={i}
@@ -1008,6 +1196,7 @@ export default function QuizScreen({ navigation, route }: Props) {
                       hasAnswer && styles.examTileAnswered,
                       !hasAnswer && !isCurrent && styles.examTileSkipped,
                       isFlaggedQ && styles.examTileFlagged,
+                      !matchesFilters && styles.examTileDimmed,
                     ]}
                     onPress={() => {
                       setShowExamReview(false);
@@ -1121,7 +1310,11 @@ export default function QuizScreen({ navigation, route }: Props) {
                 style={[styles.modalBtn, styles.modalBtnDanger]}
                 onPress={() => {
                   setShowSkipConfirm(false);
-                  setViewPos(v => v + 1);
+                  if (viewPos === totalQuestions - 1) {
+                    setShowExamReview(true); // no Q66 — go to Review panel instead
+                  } else {
+                    setViewPos(v => v + 1);
+                  }
                 }}
               >
                 <Text style={styles.modalBtnDangerText}>Skip</Text>
@@ -1889,5 +2082,27 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     color: '#fff',
+  },
+  examFilterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 6,
+    marginBottom: 14,
+  },
+  examFilterChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  examFilterChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  examTileDimmed: {
+    opacity: 0.2,
   },
 });

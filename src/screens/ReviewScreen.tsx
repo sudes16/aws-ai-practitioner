@@ -17,7 +17,8 @@ import { getAllQuestions } from '../utils/quizEngine';
 import { shadow } from '../utils/styleUtils';
 import { useTheme } from '../contexts/ThemeContext';
 import { ColorScheme } from '../constants/colors';
-import { getAllNotes } from '../utils/noteStore';
+import { formatDate } from '../utils/dateUtils';
+import { useNotes } from '../contexts/NotesContext';
 import ExplanationModal from '../components/ExplanationModal';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Review'>;
@@ -30,14 +31,6 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: 'flagged', label: '🚩 Flagged' },
 ];
 
-const formatDate = (iso: string): string => {
-  try {
-    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  } catch {
-    return iso.slice(0, 10);
-  }
-};
-
 export default function ReviewScreen({ navigation, route }: Props) {
   const { history, initialFilter, date, mode, total, pct, quit } = route.params;
   const questions = getAllQuestions();
@@ -47,7 +40,7 @@ export default function ReviewScreen({ navigation, route }: Props) {
 
   const [filter, setFilter] = useState<Filter>(initialFilter ?? 'all');
   const [modalEntry, setModalEntry] = useState<HistoryEntry | null>(null);
-  const [notesMap, setNotesMap] = useState<Record<number, string>>({});
+  const { notesMap } = useNotes();
 
   const flatListRef = useRef<FlatList>(null);
   const isInternalScroll = useRef(false);
@@ -56,7 +49,6 @@ export default function ReviewScreen({ navigation, route }: Props) {
   const listRefs = useRef<Record<string, FlatList | null>>({});
 
   useEffect(() => {
-    getAllNotes().then(setNotesMap);
     // If there's an initial filter, scroll to it on mount
     if (initialFilter) {
       const idx = FILTERS.findIndex(f => f.key === initialFilter);
@@ -305,7 +297,7 @@ export default function ReviewScreen({ navigation, route }: Props) {
       <View style={styles.actionBar}>
         <TouchableOpacity
           style={styles.homeBtn}
-          onPress={() => navigation.navigate('Home')}
+          onPress={() => navigation.goBack()}
           activeOpacity={0.8}
         >
           <Text style={styles.homeBtnText}>⬅  Back</Text>

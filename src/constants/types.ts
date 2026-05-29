@@ -68,6 +68,7 @@ export type RootStackParamList = {
     total: number;
     score: number;
     quit: boolean;
+    config?: QuizConfig;
   };
   Review: {
     history: HistoryEntry[];

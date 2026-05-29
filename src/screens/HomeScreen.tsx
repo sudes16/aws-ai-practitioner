@@ -424,6 +424,11 @@ export default function HomeScreen({ navigation }: Props) {
                 </TouchableOpacity>
               ))}
             </View>
+            {quizMode === 'spaced' && (
+              <Text style={styles.modeHint}>
+                🧠 Smart Study uses spaced repetition (SM-2) to prioritise questions you find difficult. Questions answered correctly appear less often; wrong answers return sooner. Ideal for long-term retention.
+              </Text>
+            )}
           </View>
 
           <View style={shared.card}>
@@ -837,6 +842,7 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   typeBtnSub: { fontSize: 10, color: colors.textMuted },
   typeBtnSubActive: { color: colors.awsOrange },
   typeBtnDisabled: { opacity: 0.38 },
+  modeHint: { fontSize: 12, color: colors.textMuted, marginTop: 10, lineHeight: 18, paddingHorizontal: 4 },
 
   domainDropdownTrigger: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.cardBg, borderRadius: 10, borderWidth: 1.5, borderColor: colors.border, padding: 12 },
   domainDropdownTriggerOpen: { borderColor: colors.awsOrange },

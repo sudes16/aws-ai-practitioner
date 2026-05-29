@@ -45,7 +45,3 @@ __pycache__/
 # Dev-only scripts
 setup.ps1
 generate_assets.py
-
-# Internal docs (not needed for build or Play Store)
-CODE_REVIEW.md
-privacy-policy.html

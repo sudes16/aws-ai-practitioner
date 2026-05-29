@@ -228,7 +228,7 @@ export async function resetExamHistory(): Promise<void> {
 const OTA_QUESTIONS_KEY = 'ota_questions_cache';
 const OTA_ETAG_KEY      = 'ota_questions_etag';
 // Set OTA_ENABLED to true and replace OTA_QUESTIONS_URL with a real hosted URL to enable OTA updates.
-const OTA_ENABLED = false;
+const OTA_ENABLED = true;
 const OTA_QUESTIONS_URL = 'https://raw.githubusercontent.com/sudes16/AppStore/main/questions.json';
 
 function isValidQuestion(q: unknown): q is Question {

@@ -27,6 +27,7 @@ import {
 import { useTheme } from '../contexts/ThemeContext';
 import { ColorScheme } from '../constants/colors';
 import { shadow } from '../utils/styleUtils';
+import { useNotes } from '../contexts/NotesContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SessionHistory'>;
 
@@ -55,6 +56,7 @@ export default function SessionHistoryScreen({ navigation }: Props) {
   const [scoreHistory, setScoreHistory]   = useState<ScoreSession[]>([]);
   const [sessionRecords, setSessionRecords] = useState<SessionRecord[]>([]);
   const [activeTab, setActiveTab]          = useState<TabKey>('all');
+  const { notesMap }                       = useNotes();
 
   const flatListRef = useRef<FlatList>(null);
   const isInternalScroll = useRef(false);
@@ -189,6 +191,9 @@ export default function SessionHistoryScreen({ navigation }: Props) {
                           {answeredLabel} correct ({s.pct}%){s.quit ? ' (quit)' : ''}
                         </Text>
                       </View>
+                      {record && record.history.some(h => notesMap[h.questionNumber]) && (
+                        <Text style={styles.noteBadge}>✎</Text>
+                      )}
                       <Text style={[styles.historyPct, { color: s.pct >= 70 ? colors.correct : colors.wrong }]}>
                         {s.pct}%
                       </Text>
@@ -366,6 +371,7 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   historySubtitle: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
   historyPct:      { fontSize: 16, fontWeight: '800', minWidth: 46, textAlign: 'right' },
   historyChevron:  { color: colors.textSecondary, fontSize: 20, marginLeft: 4 },
+  noteBadge: { fontSize: 14, color: colors.awsOrange, marginRight: 4 },
 
   clearRow: {
     flexDirection: 'row',

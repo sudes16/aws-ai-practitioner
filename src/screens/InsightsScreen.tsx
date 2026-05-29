@@ -10,12 +10,13 @@ import {
   FlatList,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { LineChart } from 'react-native-chart-kit';
-import { RootStackParamList, DOMAIN_LABELS } from '../constants/types';
+import { RootStackParamList, DOMAIN_LABELS, DomainFilter, QuizConfig } from '../constants/types';
 import {
   getScoreHistory,
   getMasteredCount,
@@ -23,7 +24,7 @@ import {
   ScoreSession,
   SessionRecord,
 } from '../utils/storage';
-import { getTotalCount } from '../utils/quizEngine';
+import { getTotalCount, buildIndices } from '../utils/quizEngine';
 import { useTheme } from '../contexts/ThemeContext';
 import { ColorScheme } from '../constants/colors';
 import { shadow, SHARED_STYLES } from '../utils/styleUtils';
@@ -59,6 +60,7 @@ export default function InsightsScreen({ navigation }: Props) {
   const [masteredCount, setMasteredCount] = useState(0);
   const [sessionRecords, setSessionRecords] = useState<SessionRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [practiceTarget, setPracticeTarget] = useState<DomainFilter | null>(null);
   const totalQCount = getTotalCount();
 
   const flatListRef = useRef<FlatList>(null);
@@ -300,6 +302,13 @@ export default function InsightsScreen({ navigation }: Props) {
                     <View style={styles.domainBarTrack}>
                       <View style={[styles.domainBarFill, { width: pct !== null ? `${pct}%` as any : '0%', backgroundColor: barColor }]} />
                     </View>
+                    <TouchableOpacity
+                      style={styles.domainPracticeBtn}
+                      onPress={() => setPracticeTarget(d as DomainFilter)}
+                      accessibilityLabel={`Practice ${DOMAIN_LABELS[d]}`}
+                    >
+                      <Text style={styles.domainPracticeBtnText}>Practice →</Text>
+                    </TouchableOpacity>
                   </View>
                 );
               })}
@@ -377,6 +386,57 @@ export default function InsightsScreen({ navigation }: Props) {
           })}
         />
       </View>
+
+      {/* ── Domain Practice Mode Picker ─────────────────────────────────────── */}
+      <Modal
+        visible={practiceTarget !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPracticeTarget(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>
+              Practice: {practiceTarget !== null ? DOMAIN_LABELS[practiceTarget] : ''}
+            </Text>
+            <Text style={styles.modalBody}>Choose a mode to start:</Text>
+            <View style={styles.modalBtns}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnSecondary]}
+                onPress={() => setPracticeTarget(null)}
+              >
+                <Text style={styles.modalBtnSecText}>Cancel</Text>
+              </TouchableOpacity>
+              {(['Study', 'Test'] as const).map(label => (
+                <TouchableOpacity
+                  key={label}
+                  style={[styles.modalBtn, { backgroundColor: colors.awsDark }]}
+                  onPress={async () => {
+                    if (practiceTarget === null) return;
+                    const studyMode = label === 'Study';
+                    const baseConfig: Omit<QuizConfig, 'indices'> = {
+                      mode: 'random',
+                      fromQ: 1,
+                      toQ: 65,
+                      count: 20,
+                      timed: false,
+                      timePerQuestion: 60,
+                      questionType: 'all',
+                      domain: practiceTarget,
+                      studyMode,
+                    };
+                    const indices = await buildIndices(baseConfig);
+                    setPracticeTarget(null);
+                    navigation.navigate('Quiz', { config: { ...baseConfig, indices } });
+                  }}
+                >
+                  <Text style={styles.modalBtnPrimaryText}>{label} Mode</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -413,8 +473,20 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   domainInfo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   domainName: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, flex: 1 },
   domainPctBadge: { fontSize: 10, fontWeight: '800', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' },
-  domainBarTrack: { height: 8, borderRadius: 4, backgroundColor: colors.border, overflow: 'hidden' },
+  domainBarTrack: { height: 8, borderRadius: 4, backgroundColor: colors.border, overflow: 'hidden', marginBottom: 6 },
   domainBarFill: { height: 8, borderRadius: 4 },
+  domainPracticeBtn: { alignSelf: 'flex-end', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, backgroundColor: colors.awsDark + '20', borderWidth: 1, borderColor: colors.awsDark },
+  domainPracticeBtnText: { fontSize: 11, fontWeight: '700', color: colors.awsDark },
+  // ── Modal styles ──
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' },
+  modalBox: { width: '85%', backgroundColor: colors.cardBg, borderRadius: 14, padding: 20 },
+  modalTitle: { fontSize: 17, fontWeight: '800', color: colors.textPrimary, marginBottom: 8 },
+  modalBody: { fontSize: 14, color: colors.textSecondary, marginBottom: 16 },
+  modalBtns: { flexDirection: 'row', gap: 10 },
+  modalBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
+  modalBtnSecondary: { backgroundColor: colors.border },
+  modalBtnSecText: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  modalBtnPrimaryText: { fontSize: 15, fontWeight: '700', color: '#fff' },
   progressHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
   progressTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, flex: 1 },
   progressPct: { fontSize: 20, fontWeight: '800' },

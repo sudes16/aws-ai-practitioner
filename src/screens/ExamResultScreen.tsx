@@ -119,7 +119,10 @@ export default function ExamResultScreen({ navigation }: Props) {
           <Text style={styles.passNote}>Pass mark: 70% ({Math.ceil(EXAM_TOTAL_QS * PASS_THRESHOLD_PCT / 100)}/{EXAM_TOTAL_QS})</Text>
         </View>
 
-        {/* ── Time row ── */}
+        {/* ── History hint ── */}
+        <Text style={styles.historyHint}>📋 Your results and answers are saved in History for later review</Text>
+
+        {/* ── Time row ── */
         <View style={styles.timeRow}>
           <Text style={styles.timeLabel}>⏱ Time used</Text>
           <Text style={styles.timeValue}>
@@ -158,24 +161,18 @@ export default function ExamResultScreen({ navigation }: Props) {
           </View>
         ))}
 
-        {/* ── Action Buttons ── */}
-        <View style={styles.btnRow}>
-          <TouchableOpacity
-            style={styles.homeBtn}
-            onPress={() => navigation.navigate('Home')}
-          >
-            <Text style={styles.homeBtnText}>✕ Close</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.reviewBtn}
-            onPress={() => navigation.navigate('Review', { history })}
-          >
-            <Text style={styles.reviewBtnText}>📋 Review Answers</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={{ height: 32 }} />
+        <View style={{ height: 16 }} />
       </ScrollView>
+
+      {/* ── Fixed Footer ── */}
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={styles.homeBtn}
+          onPress={() => navigation.navigate('Home')}
+        >
+          <Text style={styles.homeBtnText}>🏠 Home</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -329,36 +326,31 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     backgroundColor: colors.textMuted,
   },
 
-  // ── Action Buttons ───────────────────────────────────────────────────────
-  btnRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 24,
+  historyHint: {
+    fontSize: 12,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginBottom: 16,
+    paddingHorizontal: 8,
   },
-  reviewBtn: {
-    flex: 1,
+
+  // ── Footer ──────────────────────────────────────────────────────────────
+  footer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: colors.background,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  homeBtn: {
     paddingVertical: 14,
     borderRadius: 12,
     backgroundColor: colors.awsDark,
     alignItems: 'center',
   },
-  reviewBtnText: {
-    color: colors.textLight,
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  homeBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: colors.border,
-  },
   homeBtnText: {
-    color: colors.textPrimary,
-    fontWeight: '700',
-    fontSize: 14,
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 16,
   },
 });

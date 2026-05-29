@@ -14,6 +14,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { RootStackParamList } from '../constants/types';
 import { getQuestionReports, deleteQuestionReport, QuestionReport } from '../utils/storage';
+import { formatDate } from '../utils/dateUtils';
 import { useTheme } from '../contexts/ThemeContext';
 import { ColorScheme } from '../constants/colors';
 
@@ -31,14 +32,6 @@ const CATEGORY_COLOR: Record<QuestionReport['category'], string> = {
   typo: '#D97706',
   unclear: '#2563EB',
   other: '#6B7280',
-};
-
-const formatDate = (iso: string): string => {
-  try {
-    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  } catch {
-    return iso.slice(0, 10);
-  }
 };
 
 export default function ReportsScreen({ navigation }: Props) {

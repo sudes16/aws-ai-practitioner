@@ -69,7 +69,7 @@ function feedbackMsg(pct: number): string {
 }
 
 export default function ResultScreen({ navigation, route }: Props) {
-  const { history, total, score, quit } = route.params;
+  const { history, total, score, quit, config } = route.params;
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -232,15 +232,38 @@ export default function ResultScreen({ navigation, route }: Props) {
           style={[styles.footerBtn, styles.footerBtnHome, styles.footerBtnHalf]}
           onPress={() => navigation.replace('Home')}
         >
-          <Text style={styles.footerBtnHomeText}>✕ Close</Text>
+          <Text style={styles.footerBtnHomeText}>🏠 Home</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.footerBtn, styles.footerBtnReview, styles.footerBtnHalf, history.length === 0 && styles.footerBtnDisabled]}
-          onPress={history.length > 0 ? () => navigation.navigate('Review', { history }) : undefined}
-          disabled={history.length === 0}
+          style={[
+            styles.footerBtn,
+            styles.footerBtnReview,
+            styles.footerBtnHalf,
+            incorrect === 0 && styles.footerBtnDisabled,
+          ]}
+          disabled={incorrect === 0}
+          onPress={() => {
+            const wrongIndices = history
+              .filter(h => h.correct === false)
+              .map(h => h.questionIndex);
+            navigation.replace('Quiz', {
+              config: {
+                mode: config?.mode ?? 'sequential',
+                fromQ: 1,
+                toQ: 65,
+                count: wrongIndices.length,
+                timed: config?.timed ?? false,
+                timePerQuestion: config?.timePerQuestion ?? 60,
+                indices: wrongIndices,
+                questionType: config?.questionType ?? 'all',
+                domain: config?.domain ?? 0,
+                studyMode: config?.studyMode ?? false,
+              },
+            });
+          }}
         >
-          <Text style={[styles.footerBtnReviewText, history.length === 0 && styles.footerBtnDisabledText]}>
-            {history.length > 0 ? '📋 Review Answers' : '📭 No Review'}
+          <Text style={[styles.footerBtnReviewText, incorrect === 0 && styles.footerBtnDisabledText]}>
+            ↺ Retry Wrong ({incorrect})
           </Text>
         </TouchableOpacity>
       </View>

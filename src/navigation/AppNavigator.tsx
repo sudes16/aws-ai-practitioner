@@ -20,6 +20,7 @@ import InsightsScreen from '../screens/InsightsScreen';
 import SessionHistoryScreen from '../screens/SessionHistoryScreen';
 import ReportsScreen from '../screens/ReportsScreen';
 import { useTheme } from '../contexts/ThemeContext';
+import { NotesProvider } from '../contexts/NotesContext';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<RootStackParamList>();
@@ -99,11 +100,12 @@ export default function AppNavigator() {
   if (initialRoute === null) return null;
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator
-        initialRouteName={initialRoute}
-        screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
-      >
+    <NotesProvider>
+      <NavigationContainer>
+        <Stack.Navigator
+          initialRouteName={initialRoute}
+          screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
+        >
         <Stack.Screen name="Onboarding" component={OnboardingScreen} />
         <Stack.Screen name="Home" component={MainTabs} />
         <Stack.Screen name="Quiz" component={QuizScreen} />
@@ -138,5 +140,6 @@ export default function AppNavigator() {
         <Stack.Screen name="SessionHistory" component={SessionHistoryScreen} />
       </Stack.Navigator>
     </NavigationContainer>
+    </NotesProvider>
   );
 }
