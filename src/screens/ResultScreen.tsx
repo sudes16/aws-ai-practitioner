@@ -167,7 +167,7 @@ export default function ResultScreen({ navigation, route }: Props) {
             ]}
           >
             <Text style={styles.passBadgeText}>
-              {pass ? '✓ PASSED' : '✗ NOT PASSED'} · {PASS_THRESHOLD_PCT}% required
+              {pass ? '✓ PASSED' : '✗ NOT PASSED'} | {PASS_THRESHOLD_PCT}% required
             </Text>
           </View>
           <Text style={styles.feedbackMsg}>{feedbackMsg(pct)}</Text>
@@ -232,7 +232,7 @@ export default function ResultScreen({ navigation, route }: Props) {
           style={[styles.footerBtn, styles.footerBtnHome, styles.footerBtnHalf]}
           onPress={() => navigation.replace('Home')}
         >
-          <Text style={styles.footerBtnHomeText}>🏠 Home</Text>
+          <Text style={styles.footerBtnHomeText}>✕ Close</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.footerBtn, styles.footerBtnReview, styles.footerBtnHalf, history.length === 0 && styles.footerBtnDisabled]}
@@ -268,8 +268,15 @@ function StatBox({
   const content = (
     <>
       <Text style={styles.statBoxIcon}>{icon}</Text>
-      <Text style={[styles.statBoxValue, { color }]}>{value}</Text>
-      <Text style={styles.statBoxLabel}>{label}</Text>
+      <Text
+        style={[styles.statBoxValue, { color }]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.5}
+      >
+        {value}
+      </Text>
+      <Text style={styles.statBoxLabel} numberOfLines={1}>{label}</Text>
       {onPress && <Text style={[styles.statBoxTap, { color }]}>›</Text>}
     </>
   );
@@ -316,17 +323,18 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 20,
+    gap: 12,
     marginBottom: 14,
+    paddingHorizontal: 8,
   },
   miniCircleWrap: {
     alignItems: 'center',
   },
   miniCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    borderWidth: 5,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 4,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.cardBg,
@@ -334,20 +342,20 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     elevation: 3,
   },
   miniCirclePct: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: '800',
-    lineHeight: 24,
+    lineHeight: 20,
   },
   miniCircleSubLabel: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '600',
-    marginTop: 2,
+    marginTop: 1,
     opacity: 0.75,
   },
   circleWrap: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
     borderWidth: 8,
     alignItems: 'center',
     justifyContent: 'center',
@@ -356,19 +364,19 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     elevation: 6,
   },
   circleScore: {
-    fontSize: 48,
+    fontSize: 40,
     fontWeight: '900',
-    lineHeight: 52,
+    lineHeight: 44,
   },
   circleDivider: {
-    fontSize: 18,
+    fontSize: 16,
     color: colors.textMuted,
     fontWeight: '600',
   },
   circlePct: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
-    marginTop: 2,
+    marginTop: 1,
   },
   passBadge: {
     paddingHorizontal: 16,
@@ -417,9 +425,9 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     padding: 12,
     alignItems: 'center',
   },
-  statBoxIcon: { fontSize: 18, marginBottom: 4 },
+  statBoxIcon: { fontSize: 18, marginBottom: 4, color: colors.textPrimary },
   statBoxValue: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '800',
   },
   statBoxLabel: {

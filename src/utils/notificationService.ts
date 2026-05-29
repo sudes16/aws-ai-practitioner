@@ -1,20 +1,17 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
+import { SchedulableTriggerInputTypes } from 'expo-notifications';
 
-// Lazy-import expo-notifications only on native (not web)
-let Notifications: typeof import('expo-notifications') | null = null;
+// Register handler once at module init
 if (Platform.OS !== 'web') {
-  Notifications = require('expo-notifications');
-  // Register handler once at module init — must happen before any scheduling
-  if (Notifications) {
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: false,
-      }),
-    });
-  }
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
 }
 
 const STORAGE_KEY = 'studyReminder';
@@ -57,7 +54,7 @@ export async function saveReminderSettings(settings: ReminderSettings): Promise<
 }
 
 export async function requestNotificationPermissions(): Promise<boolean> {
-  if (!Notifications) return false;
+  if (Platform.OS === 'web') return false;
   const { status: existing } = await Notifications.getPermissionsAsync();
   if (existing === 'granted') return true;
   const { status } = await Notifications.requestPermissionsAsync();
@@ -85,14 +82,14 @@ export async function scheduleReminder(
   days: number[],
   repeating: boolean,
 ): Promise<void> {
-  if (!Notifications || days.length === 0) return;
+  if (Platform.OS === 'web' || days.length === 0) return;
 
   await cancelReminder();
 
   const content = {
     title: '📚 Time to Study!',
     body: "Don't forget your AWS AI Practitioner prep. Keep the streak going!",
-    sound: true as const,
+    sound: true,
   };
 
   const ids: string[] = [];
@@ -101,12 +98,21 @@ export async function scheduleReminder(
     if (repeating) {
       id = await Notifications.scheduleNotificationAsync({
         content,
-        trigger: { weekday, hour, minute, repeats: true },
+        trigger: {
+          type: SchedulableTriggerInputTypes.CALENDAR,
+          weekday,
+          hour,
+          minute,
+          repeats: true
+        },
       });
     } else {
       id = await Notifications.scheduleNotificationAsync({
         content,
-        trigger: getNextWeekdayDate(weekday, hour, minute),
+        trigger: {
+          type: SchedulableTriggerInputTypes.DATE,
+          date: getNextWeekdayDate(weekday, hour, minute),
+        },
       });
     }
     ids.push(id);
@@ -116,7 +122,7 @@ export async function scheduleReminder(
 }
 
 export async function cancelReminder(): Promise<void> {
-  if (!Notifications) return;
+  if (Platform.OS === 'web') return;
   try {
     const raw = await AsyncStorage.getItem(NOTIFICATION_ID_KEY);
     if (raw) {
@@ -132,16 +138,9 @@ export async function cancelReminder(): Promise<void> {
 // ── Exam countdown notifications ──────────────────────────────────────────
 const EXAM_COUNTDOWN_KEY = 'examCountdownNotifIds';
 
-/**
- * Schedules two notifications for an upcoming exam date:
- *   - 7 days before: "1 week until your AWS exam!"
- *   - 1 day before: "Your AWS exam is tomorrow!"
- * Silently no-ops if permissions are not granted, exam is in the past, or on web.
- */
 export async function scheduleExamCountdownNotifications(examDate: string): Promise<void> {
-  if (!Notifications || Platform.OS === 'web') return;
+  if (Platform.OS === 'web') return;
 
-  // Cancel any existing countdown notifications first
   await cancelExamCountdownNotifications();
 
   const granted = await requestNotificationPermissions();
@@ -169,7 +168,10 @@ export async function scheduleExamCountdownNotifications(examDate: string): Prom
     if (triggerMs > now) {
       const id = await Notifications.scheduleNotificationAsync({
         content: { title: m.title, body: m.body, sound: true },
-        trigger: new Date(triggerMs),
+        trigger: {
+          type: SchedulableTriggerInputTypes.DATE,
+          date: triggerMs,
+        },
       });
       ids.push(id);
     }
@@ -181,7 +183,7 @@ export async function scheduleExamCountdownNotifications(examDate: string): Prom
 }
 
 export async function cancelExamCountdownNotifications(): Promise<void> {
-  if (!Notifications) return;
+  if (Platform.OS === 'web') return;
   try {
     const raw = await AsyncStorage.getItem(EXAM_COUNTDOWN_KEY);
     if (raw) {

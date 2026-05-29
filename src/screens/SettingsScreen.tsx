@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
+import Constants from 'expo-constants';
 import { RootStackParamList } from '../constants/types';
 import { getProfile, saveProfile, getDaysLeft, UserProfile, validateProfileInputs } from '../utils/profileStore';
 import {
@@ -27,22 +29,24 @@ import {
   DEFAULT_REMINDER_MINUTE as REMINDER_MINUTE,
 } from '../utils/notificationService';
 import { getExamSeenCount, getTotalCount, resetExamHistory } from '../utils/quizEngine';
-import { getQuestionReports } from '../utils/storage';
+import { getQuestionReports, resetMasteredQuestions, getMasteredQuestions } from '../utils/storage';
 
 import { resetSRData, getSRRecordCount } from '../utils/spacedRepetition';
+import { getAiKey, saveAiKey } from '../utils/aiService';
 import { useTheme } from '../contexts/ThemeContext';
 import { ColorScheme } from '../constants/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
-const APP_VERSION = '1.0.0';
 const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.awsquiz.aifpractitioner';
 const SHARE_MESSAGE = 'Preparing for the AWS AI Practitioner (AIF-C01) exam? Check out this free practice quiz app!';
+const AI_STUDIO_URL = 'https://aistudio.google.com/';
 
 export default function SettingsScreen({ navigation }: Props) {
   const { colors, isDark, themeMode, setThemeMode } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
+  const scrollRef = useRef<ScrollView>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [editing, setEditing]   = useState(false);
   const [obName, setObName]     = useState('');
@@ -51,11 +55,16 @@ export default function SettingsScreen({ navigation }: Props) {
   const [obYear, setObYear]     = useState('');
   const [obError, setObError]   = useState('');
 
+  // ── AI Key state ──
+  const [aiKey, setAiKey] = useState('');
+  const [showAiKey, setShowAiKey] = useState(false);
+
   // ── Exam history state ──
   const [examSeenCount, setExamSeenCount] = useState(0);
   const [srRecordCount, setSrRecordCount] = useState(0);
   const [reportCount, setReportCount] = useState(0);
   const totalQuestions = getTotalCount();
+  const [masteredCount, setMasteredCount] = useState(0);
 
   // ── Reminder state ──
   const [reminderEnabled, setReminderEnabled] = useState(false);
@@ -63,27 +72,56 @@ export default function SettingsScreen({ navigation }: Props) {
   const [reminderDays, setReminderDays]       = useState<number[]>([2, 3, 4, 5, 6]);
   const [reminderRepeating, setReminderRepeating] = useState(true);
 
-  useEffect(() => {
-    getProfile().then(p => {
-      if (p) {
-        setProfile(p);
-        const [y, m, d] = p.examDate.split('-');
-        setObName(p.name);
-        setObMonth(m);
-        setObDay(d);
-        setObYear(y);
-      }
-    });
-    getExamSeenCount().then(setExamSeenCount);
-    getSRRecordCount().then(setSrRecordCount);
-    getQuestionReports().then(r => setReportCount(r.length));
-    getReminderSettings().then(s => {
-      setReminderEnabled(s.enabled);
-      setReminderHour(s.hour);
-      setReminderDays(s.days ?? [2, 3, 4, 5, 6]);
-      setReminderRepeating(s.repeating ?? true);
-    });
-  }, []);
+  // ── Automatic Version Logic ──
+  const appVersion = Constants.expoConfig?.version ?? '1.0.0';
+  const buildNumber = Platform.OS === 'android' ? Constants.expoConfig?.android?.versionCode : Constants.expoConfig?.ios?.buildNumber;
+  const fullVersionString = buildNumber ? `${appVersion} (Build ${buildNumber})` : appVersion;
+  const packageId = Constants.expoConfig?.android?.package ?? 'com.awsquiz.aifpractitioner';
+
+  useFocusEffect(
+    React.useCallback(() => {
+      // Scroll to top when screen is focused
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+
+      const loadData = async () => {
+        try {
+          const [p, k, es, sr, rc, ms] = await Promise.all([
+            getProfile(),
+            getAiKey(),
+            getExamSeenCount(),
+            getSRRecordCount(),
+            getQuestionReports(),
+            getMasteredQuestions(),
+          ]);
+
+          if (p) {
+            setProfile(p);
+            const [y, m, d] = p.examDate.split('-');
+            setObName(p.name);
+            setObMonth(m);
+            setObDay(d);
+            setObYear(y);
+          }
+          setAiKey(k ?? '');
+          setExamSeenCount(es);
+          setSrRecordCount(sr);
+          setReportCount(rc.length);
+          setMasteredCount(ms.length);
+        } catch (err) {
+          console.error("Settings load failed", err);
+        }
+      };
+
+      loadData();
+
+      getReminderSettings().then(s => {
+        setReminderEnabled(s.enabled);
+        setReminderHour(s.hour);
+        setReminderDays(s.days ?? [2, 3, 4, 5, 6]);
+        setReminderRepeating(s.repeating ?? true);
+      });
+    }, [])
+  );
 
   const handleSave = async () => {
     const result = validateProfileInputs(obName, obMonth, obDay, obYear);
@@ -98,6 +136,11 @@ export default function SettingsScreen({ navigation }: Props) {
     setEditing(false);
     setObError('');
     scheduleExamCountdownNotifications(result.examDate).catch(() => {});
+  };
+
+  const handleAiKeySave = async (text: string) => {
+    setAiKey(text);
+    await saveAiKey(text);
   };
 
   // Web-safe confirmation: Alert.alert is a no-op on Expo Web
@@ -118,6 +161,15 @@ export default function SettingsScreen({ navigation }: Props) {
       'This will erase all spaced repetition progress. Your study intervals will restart from scratch. Continue?',
       'Reset',
       async () => { await resetSRData(); setSrRecordCount(0); },
+    );
+  };
+
+  const handleResetMastered = () => {
+    confirmAction(
+      'Reset Progress?',
+      'This will permanently clear all your mastered questions. The Weak mode pool will reset to all questions. Continue?',
+      'Reset',
+      async () => { await resetMasteredQuestions(); setMasteredCount(0); },
     );
   };
 
@@ -201,7 +253,7 @@ export default function SettingsScreen({ navigation }: Props) {
     : '';
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
@@ -212,6 +264,7 @@ export default function SettingsScreen({ navigation }: Props) {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -230,16 +283,23 @@ export default function SettingsScreen({ navigation }: Props) {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.profileName}>{profile?.name ?? '—'}</Text>
                   {profile && (
-                    <Text style={styles.profileDate}>
+                    <Text
+                      style={styles.profileDate}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.8}
+                    >
                       {'Exam: '}{examDateFormatted}
                       {daysLeft !== null && (
-                        <Text style={[
-                          styles.profileDaysTag,
-                          { color: daysLeft > 7 ? colors.correct : daysLeft > 2 ? colors.awsOrange : daysLeft >= 0 ? colors.wrong : colors.textMuted },
-                        ]}>
-                          {'  ·  '}
-                          {daysLeft > 0 ? `${daysLeft}d left` : daysLeft === 0 ? 'Today!' : `${Math.abs(daysLeft)}d ago`}
-                        </Text>
+                        <>
+                          <Text style={{ color: colors.textMuted }}>{'  |  '}</Text>
+                          <Text style={[
+                            styles.profileDaysTag,
+                            { color: daysLeft > 7 ? colors.correct : daysLeft > 2 ? colors.awsOrange : daysLeft >= 0 ? colors.wrong : colors.textMuted },
+                          ]}>
+                            {daysLeft > 0 ? `${daysLeft}d left` : daysLeft === 0 ? 'Today!' : `${Math.abs(daysLeft)}d ago`}
+                          </Text>
+                        </>
                       )}
                     </Text>
                   )}
@@ -340,6 +400,36 @@ export default function SettingsScreen({ navigation }: Props) {
                 </Text>
               </TouchableOpacity>
             ))}
+          </View>
+        </View>
+
+        {/* ── AI Insights ── */}
+        <Text style={styles.sectionLabel}>AI Insights</Text>
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <Text style={styles.rowIcon}>✨</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowLabel}>Gemini API Key</Text>
+              <Text style={styles.rowSub}>Get a free key at <Text style={{ color: colors.awsOrange, textDecorationLine: 'underline' }} onPress={() => Linking.openURL(AI_STUDIO_URL)}>Google AI Studio</Text></Text>
+            </View>
+            <TouchableOpacity onPress={() => setShowAiKey(!showAiKey)}>
+              <Text style={{ fontSize: 18 }}>{showAiKey ? '👁️' : '👁️‍🗨️'}</Text>
+            </TouchableOpacity>
+          </View>
+          <TextInput
+            style={[styles.input, { marginTop: 0, marginBottom: 16 }]}
+            value={aiKey}
+            onChangeText={handleAiKeySave}
+            placeholder="Paste your API key here..."
+            placeholderTextColor={colors.textMuted}
+            secureTextEntry={!showAiKey}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+            <Text style={[styles.rowSub, { fontStyle: 'italic' }]}>
+              Note: This key is stored locally on your device and used only to generate deep-dive explanations during quizzes.
+            </Text>
           </View>
         </View>
 
@@ -450,6 +540,25 @@ export default function SettingsScreen({ navigation }: Props) {
         <Text style={styles.sectionLabel}>Data &amp; Progress</Text>
         <View style={styles.card}>
           <View style={styles.row}>
+            <Text style={styles.rowIcon}>✅</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowLabel}>Mastered questions</Text>
+              <Text style={styles.rowSub}>
+                {masteredCount} questions marked as confident
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={handleResetMastered}
+              disabled={masteredCount === 0}
+              style={[styles.resetBtn, masteredCount === 0 && styles.resetBtnDisabled]}
+            >
+              <Text style={[styles.resetBtnText, masteredCount === 0 && styles.resetBtnTextDisabled]}>
+                Reset
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.rowDivider} />
+          <View style={styles.row}>
             <Text style={styles.rowIcon}>🎓</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.rowLabel}>Exam question history</Text>
@@ -503,15 +612,15 @@ export default function SettingsScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
 
-        {/* ── Legal ── */}
-        <Text style={styles.sectionLabel}>Legal</Text>
+        {/* ── Support & Help ── */}
+        <Text style={styles.sectionLabel}>Support & Help</Text>
         <View style={styles.card}>
           <TouchableOpacity
             style={styles.row}
-            onPress={() => navigation.navigate('PrivacyPolicy')}
+            onPress={() => navigation.navigate('Help')}
           >
-            <Text style={styles.rowIcon}>🔒</Text>
-            <Text style={styles.rowLabel}>Privacy Policy</Text>
+            <Text style={styles.rowIcon}>💡</Text>
+            <Text style={styles.rowLabel}>How to Use</Text>
             <Text style={styles.rowChevron}>›</Text>
           </TouchableOpacity>
           <View style={styles.rowDivider} />
@@ -521,6 +630,19 @@ export default function SettingsScreen({ navigation }: Props) {
           >
             <Text style={styles.rowIcon}>📚</Text>
             <Text style={styles.rowLabel}>AWS Exam Guide</Text>
+            <Text style={styles.rowChevron}>›</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Legal ── */}
+        <Text style={styles.sectionLabel}>Legal</Text>
+        <View style={styles.card}>
+          <TouchableOpacity
+            style={styles.row}
+            onPress={() => navigation.navigate('PrivacyPolicy')}
+          >
+            <Text style={styles.rowIcon}>🔒</Text>
+            <Text style={styles.rowLabel}>Privacy Policy</Text>
             <Text style={styles.rowChevron}>›</Text>
           </TouchableOpacity>
         </View>
@@ -535,12 +657,17 @@ export default function SettingsScreen({ navigation }: Props) {
           <View style={styles.rowDivider} />
           <View style={styles.aboutRow}>
             <Text style={styles.aboutKey}>Version</Text>
-            <Text style={styles.aboutVal}>{APP_VERSION}</Text>
+            <Text style={styles.aboutVal}>{fullVersionString}</Text>
+          </View>
+          <View style={styles.rowDivider} />
+          <View style={styles.aboutRow}>
+            <Text style={styles.aboutKey}>Identifier</Text>
+            <Text style={styles.aboutVal}>{packageId}</Text>
           </View>
           <View style={styles.rowDivider} />
           <View style={styles.aboutRow}>
             <Text style={styles.aboutKey}>Platform</Text>
-            <Text style={styles.aboutVal}>Expo SDK 51 · React Native</Text>
+            <Text style={styles.aboutVal}>Expo SDK 52 | React Native</Text>
           </View>
           <View style={styles.rowDivider} />
           <View style={styles.aboutRow}>

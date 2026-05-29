@@ -93,11 +93,11 @@ export default function ExamResultScreen({ navigation }: Props) {
   });
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
       {/* ── Header ── */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Exam Complete</Text>
-        <Text style={styles.headerSub}>AWS AI Practitioner · AIF-C01</Text>
+        <Text style={styles.headerSub}>AWS AI Practitioner | AIF-C01</Text>
       </View>
 
       <ScrollView
@@ -135,7 +135,7 @@ export default function ExamResultScreen({ navigation }: Props) {
             <View style={styles.domainHeader}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.domainName}>{DOMAIN_LABELS[domain]}</Text>
-                <Text style={styles.domainWeight}>Exam weight: {examPct}% · ~{expected} Qs</Text>
+                <Text style={styles.domainWeight}>Exam weight: {examPct}% | ~{expected} Qs</Text>
               </View>
               <Text style={[styles.domainScore, pct >= 70 ? styles.domainPass : styles.domainFail]}>
                 {correct}/{total}
@@ -161,16 +161,16 @@ export default function ExamResultScreen({ navigation }: Props) {
         {/* ── Action Buttons ── */}
         <View style={styles.btnRow}>
           <TouchableOpacity
+            style={styles.homeBtn}
+            onPress={() => navigation.navigate('Home')}
+          >
+            <Text style={styles.homeBtnText}>✕ Close</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={styles.reviewBtn}
             onPress={() => navigation.navigate('Review', { history })}
           >
             <Text style={styles.reviewBtnText}>📋 Review Answers</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.homeBtn}
-            onPress={() => navigation.navigate('Home')}
-          >
-            <Text style={styles.homeBtnText}>🏠 Home</Text>
           </TouchableOpacity>
         </View>
 

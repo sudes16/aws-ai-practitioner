@@ -66,7 +66,7 @@ export default function ReportsScreen({ navigation }: Props) {
     ];
     const rows = reports.flatMap(r => {
       const lines = [
-        `Q#${r.questionNumber} · ${CATEGORY_LABEL[r.category]} · ${formatDate(r.timestamp)}`,
+        `Q#${r.questionNumber} | ${CATEGORY_LABEL[r.category]} | ${formatDate(r.timestamp)}`,
         `"${r.questionText}"`,
       ];
       if (r.note) lines.push(`Note: ${r.note}`);
@@ -92,7 +92,7 @@ export default function ReportsScreen({ navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>

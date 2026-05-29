@@ -1,13 +1,17 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
   StyleSheet,
+  useWindowDimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList, HistoryEntry } from '../constants/types';
 import { getAllQuestions } from '../utils/quizEngine';
 import { shadow } from '../utils/styleUtils';
@@ -39,12 +43,55 @@ export default function ReviewScreen({ navigation, route }: Props) {
   const questions = getAllQuestions();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { width: screenWidth } = useWindowDimensions();
 
   const [filter, setFilter] = useState<Filter>(initialFilter ?? 'all');
   const [modalEntry, setModalEntry] = useState<HistoryEntry | null>(null);
   const [notesMap, setNotesMap] = useState<Record<number, string>>({});
 
-  useEffect(() => { getAllNotes().then(setNotesMap); }, []);
+  const flatListRef = useRef<FlatList>(null);
+  const isInternalScroll = useRef(false);
+
+  // Refs for internal lists to reset position
+  const listRefs = useRef<Record<string, FlatList | null>>({});
+
+  useEffect(() => {
+    getAllNotes().then(setNotesMap);
+    // If there's an initial filter, scroll to it on mount
+    if (initialFilter) {
+      const idx = FILTERS.findIndex(f => f.key === initialFilter);
+      if (idx !== -1) {
+        setTimeout(() => {
+          flatListRef.current?.scrollToIndex({ index: idx, animated: false });
+        }, 100);
+      }
+    }
+  }, []);
+
+  useFocusEffect(useCallback(() => {
+    // Scroll active list back to top ONLY when entering the screen
+    listRefs.current[filter]?.scrollToOffset({ offset: 0, animated: false });
+  }, []));
+
+  const handleMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (isInternalScroll.current) return;
+    const x = event.nativeEvent.contentOffset.x;
+    const index = Math.round(x / screenWidth);
+    if (index >= 0 && index < FILTERS.length) {
+      setFilter(FILTERS[index].key);
+    }
+  };
+
+  const scrollToFilter = (key: Filter) => {
+    if (filter === key) return;
+    const index = FILTERS.findIndex(f => f.key === key);
+    if (index !== -1) {
+      isInternalScroll.current = true;
+      setFilter(key);
+      flatListRef.current?.scrollToIndex({ index, animated: true });
+      setTimeout(() => { isInternalScroll.current = false; }, 400);
+    }
+  };
 
   const handleRetry = () => {
     // Extract question indices from the session and shuffle them (Fisher-Yates)
@@ -70,19 +117,11 @@ export default function ReviewScreen({ navigation, route }: Props) {
     });
   };
 
-  const filtered = history.filter(entry => {
-    if (filter === 'all') return true;
-    if (filter === 'correct') return entry.correct === true;
-    if (filter === 'wrong') return entry.correct === false;
-    if (filter === 'flagged') return entry.flagged;
-    return true;
-  });
-
   const modalQuestion = modalEntry
     ? questions[modalEntry.questionIndex]
     : null;
 
-  const renderItem = ({ item }: { item: HistoryEntry }) => {
+  const renderQuestionItem = ({ item }: { item: HistoryEntry }) => {
     const q = questions[item.questionIndex];
     if (!q) return null;
 
@@ -101,11 +140,9 @@ export default function ReviewScreen({ navigation, route }: Props) {
         onPress={() => setModalEntry(item)}
         activeOpacity={0.8}
       >
-        {/* Status strip */}
         <View style={[styles.statusStrip, { backgroundColor: statusColor }]} />
 
         <View style={styles.cardBody}>
-          {/* Row: Q number + status badge + flag */}
           <View style={styles.cardMeta}>
             <Text style={styles.cardQNum}>Q {q.number}</Text>
             <View style={[styles.statusBadge, { backgroundColor: statusColor + '22' }]}>
@@ -121,12 +158,10 @@ export default function ReviewScreen({ navigation, route }: Props) {
             {item.flagged && <Text style={styles.flaggedIcon}>🚩</Text>}
           </View>
 
-          {/* Question text preview */}
           <Text style={styles.cardQuestion} numberOfLines={2}>
             {q.question}
           </Text>
 
-          {/* Your answer vs correct */}
           {!item.isHotspot && (
             <View style={styles.answerRow}>
               <Text style={styles.answerLabel}>
@@ -167,9 +202,37 @@ export default function ReviewScreen({ navigation, route }: Props) {
     );
   };
 
+  const renderFilterPage = ({ item }: { item: Filter }) => {
+    const filterKey = item;
+    const filteredData = history.filter(entry => {
+      if (filterKey === 'all') return true;
+      if (filterKey === 'correct') return entry.correct === true;
+      if (filterKey === 'wrong') return entry.correct === false;
+      if (filterKey === 'flagged') return entry.flagged;
+      return true;
+    });
+
+    return (
+      <View style={{ width: screenWidth }}>
+        <FlatList
+          ref={r => { listRefs.current[filterKey] = r; }}
+          data={filteredData}
+          keyExtractor={item => String(item.questionNumber)}
+          renderItem={renderQuestionItem}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyWrap}>
+              <Text style={styles.emptyText}>No questions in this filter.</Text>
+            </View>
+          }
+        />
+      </View>
+    );
+  };
+
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      {/* Header */}
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.closeBtn}
@@ -185,14 +248,13 @@ export default function ReviewScreen({ navigation, route }: Props) {
           </Text>
           {date && (
             <Text style={styles.headerContextSub} numberOfLines={1}>
-              {formatDate(date)}{total !== undefined ? ` · ${total}Q` : ''}{pct !== undefined ? ` · ${pct}%` : ''}{quit ? ' (quit)' : ''}
+              {formatDate(date)}{total !== undefined ? ` | ${total}Q` : ''}{pct !== undefined ? ` | ${pct}%` : ''}{quit ? ' (quit)' : ''}
             </Text>
           )}
         </View>
         <Text style={styles.headerSub}>{history.length} answered</Text>
       </View>
 
-      {/* Filter tabs */}
       <View style={styles.filterWrap}>
         <FlatList
           data={FILTERS}
@@ -206,7 +268,7 @@ export default function ReviewScreen({ navigation, route }: Props) {
                 styles.filterTab,
                 filter === f.key && styles.filterTabActive,
               ]}
-              onPress={() => setFilter(f.key)}
+              onPress={() => scrollToFilter(f.key)}
             >
               <Text
                 style={[
@@ -221,28 +283,32 @@ export default function ReviewScreen({ navigation, route }: Props) {
         />
       </View>
 
-      {/* List */}
-      <FlatList
-        data={filtered}
-        keyExtractor={item => String(item.questionNumber)}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyWrap}>
-            <Text style={styles.emptyText}>No questions in this filter.</Text>
-          </View>
-        }
-      />
+      <View style={{ flex: 1 }}>
+        <FlatList
+          ref={flatListRef}
+          data={FILTERS.map(f => f.key)}
+          renderItem={renderFilterPage}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={handleMomentumScrollEnd}
+          scrollEventThrottle={16}
+          keyExtractor={item => item}
+          getItemLayout={(_, index) => ({
+            length: screenWidth,
+            offset: screenWidth * index,
+            index,
+          })}
+        />
+      </View>
 
-      {/* ── Sticky action bar ── */}
       <View style={styles.actionBar}>
         <TouchableOpacity
           style={styles.homeBtn}
           onPress={() => navigation.navigate('Home')}
           activeOpacity={0.8}
         >
-          <Text style={styles.homeBtnText}>🏠 Home</Text>
+          <Text style={styles.homeBtnText}>⬅  Back</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.retryBtn}
@@ -250,17 +316,21 @@ export default function ReviewScreen({ navigation, route }: Props) {
           activeOpacity={0.8}
         >
           <Text style={styles.retryBtnText}>↺  Retry</Text>
-          <Text style={styles.retryBtnSub}>{history.length}Q · reshuffled</Text>
+          <Text style={styles.retryBtnSub}>{history.length}Q | reshuffled</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Explanation modal – always mounted so the slide-out animation plays */}
       <ExplanationModal
         visible={!!modalEntry}
         explanation={modalQuestion?.explanation ?? ''}
         correctAnswer={modalEntry?.correctLetters.join(', ') ?? ''}
         isCorrect={modalEntry?.correct ?? null}
         onClose={() => setModalEntry(null)}
+        questionText={modalQuestion?.question}
+        optionsText={modalQuestion ? Object.entries(modalQuestion.options)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([letter, text]) => `${letter}. ${text}`)
+          .join('\n') : undefined}
       />
     </SafeAreaView>
   );
@@ -439,7 +509,6 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     color: colors.textSecondary,
   },
 
-  // ── Sticky action bar ─────────────────────────────────────────────────────
   actionBar: {
     flexDirection: 'row',
     gap: 10,

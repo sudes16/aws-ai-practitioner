@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,10 @@ import {
   StyleSheet,
   Alert,
   Platform,
+  FlatList,
+  useWindowDimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -46,10 +50,17 @@ function resolveAnswered(s: ScoreSession): number {
 export default function SessionHistoryScreen({ navigation }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { width: screenWidth } = useWindowDimensions();
 
   const [scoreHistory, setScoreHistory]   = useState<ScoreSession[]>([]);
   const [sessionRecords, setSessionRecords] = useState<SessionRecord[]>([]);
   const [activeTab, setActiveTab]          = useState<TabKey>('all');
+
+  const flatListRef = useRef<FlatList>(null);
+  const isInternalScroll = useRef(false);
+
+  // Refs for internal scroll views to reset position
+  const scrollRefs = useRef<Record<string, ScrollView | null>>({});
 
   const loadData = useCallback(async () => {
     const [h, r] = await Promise.all([getScoreHistory(), getSessionRecords()]);
@@ -57,25 +68,31 @@ export default function SessionHistoryScreen({ navigation }: Props) {
     setSessionRecords(r);
   }, []);
 
-  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
+  useFocusEffect(useCallback(() => {
+    loadData();
+    // Synchronized Reset: Scroll ALL horizontal pages back to top when entering
+    Object.values(scrollRefs.current).forEach(ref => ref?.scrollTo({ y: 0, animated: false }));
+  }, [loadData]));
 
-  const filteredHistory = useMemo(() => {
-    const withAnswers = scoreHistory.filter(s => resolveAnswered(s) > 0);
-    return activeTab === 'all'
-      ? withAnswers
-      : activeTab === 'exam'
-        ? withAnswers.filter(s => s.mode === 'exam')
-        : withAnswers.filter(s => s.mode !== 'exam');
-  }, [scoreHistory, activeTab]);
+  const handleMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (isInternalScroll.current) return;
+    const x = event.nativeEvent.contentOffset.x;
+    const index = Math.round(x / screenWidth);
+    if (index >= 0 && index < TABS.length) {
+      setActiveTab(TABS[index].key);
+    }
+  };
 
-  const filteredRecords = useMemo(() =>
-    activeTab === 'all'
-      ? sessionRecords
-      : activeTab === 'exam'
-        ? sessionRecords.filter(r => r.mode === 'exam')
-        : sessionRecords.filter(r => r.mode !== 'exam'),
-    [sessionRecords, activeTab],
-  );
+  const scrollToTab = (key: TabKey) => {
+    if (activeTab === key) return;
+    const index = TABS.findIndex(t => t.key === key);
+    if (index !== -1) {
+      isInternalScroll.current = true;
+      setActiveTab(key);
+      flatListRef.current?.scrollToIndex({ index, animated: true });
+      setTimeout(() => { isInternalScroll.current = false; }, 400);
+    }
+  };
 
   const handleClearAll = async () => {
     const doClear = async () => {
@@ -86,13 +103,13 @@ export default function SessionHistoryScreen({ navigation }: Props) {
     };
 
     if (Platform.OS === 'web') {
-      if (window.confirm('Clear All History\n\nThis will permanently remove all session history and analytics data.')) {
+      if (window.confirm('Clear All History\n\nThis will permanently remove all session history and insights data.')) {
         await doClear();
       }
     } else {
       Alert.alert(
         'Clear All History',
-        'This will permanently remove all session history and analytics data.',
+        'This will permanently remove all session history and insights data.',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Clear', style: 'destructive', onPress: doClear },
@@ -101,64 +118,42 @@ export default function SessionHistoryScreen({ navigation }: Props) {
     }
   };
 
-  return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      {/* ── Header ── */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.goBack()}
-          accessibilityLabel="Back"
-          accessibilityRole="button"
-        >
-          <Text style={styles.backBtnText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>📋 Review</Text>
-        <View style={{ width: 44 }} />
-      </View>
+  const renderPage = ({ item }: { item: TabKey }) => {
+    const tabKey = item;
+    const withAnswers = scoreHistory.filter(s => resolveAnswered(s) > 0);
+    const filteredHistory = tabKey === 'all'
+      ? withAnswers
+      : tabKey === 'exam'
+        ? withAnswers.filter(s => s.mode === 'exam')
+        : withAnswers.filter(s => s.mode !== 'exam');
 
-      {/* ── Tabs ── */}
-      <View style={styles.tabBar}>
-        {TABS.map(tab => {
-          const count =
-            tab.key === 'all'  ? scoreHistory.filter(s => resolveAnswered(s) > 0).length
-            : tab.key === 'exam' ? scoreHistory.filter(s => s.mode === 'exam' && resolveAnswered(s) > 0).length
-            : scoreHistory.filter(s => s.mode !== 'exam' && resolveAnswered(s) > 0).length;
-          return (
-            <TouchableOpacity
-              key={tab.key}
-              style={[styles.tab, activeTab === tab.key && styles.tabActive]}
-              onPress={() => setActiveTab(tab.key)}
-              accessibilityRole="tab"
-            >
-              <Text style={[styles.tabLabel, activeTab === tab.key && styles.tabLabelActive]}>
-                {tab.label}
-              </Text>
-              {count > 0 && (
-                <Text style={[styles.tabCount, activeTab === tab.key && styles.tabCountActive]}>
-                  {count}
-                </Text>
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+    const filteredRecords = tabKey === 'all'
+      ? sessionRecords
+      : tabKey === 'exam'
+        ? sessionRecords.filter(r => r.mode === 'exam')
+        : sessionRecords.filter(r => r.mode !== 'exam');
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+    return (
+      <ScrollView
+        ref={r => { scrollRefs.current[tabKey] = r; }}
+        style={{ width: screenWidth }}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {filteredHistory.length === 0 ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyIcon}>📋</Text>
             <Text style={styles.emptyTitle}>
-              {activeTab === 'all'
+              {tabKey === 'all'
                 ? 'No sessions yet'
-                : activeTab === 'exam'
+                : tabKey === 'exam'
                   ? 'No exam sessions yet'
                   : 'No practice sessions yet'}
             </Text>
             <Text style={styles.emptySubtitle}>
-              {activeTab === 'all'
+              {tabKey === 'all'
                 ? 'Complete a quiz or exam to see your history here.'
-                : `Complete a ${activeTab} session to see it here.`}
+                : `Complete a ${tabKey} session to see it here.`}
             </Text>
           </View>
         ) : (
@@ -188,7 +183,7 @@ export default function SessionHistoryScreen({ navigation }: Props) {
                     >
                       <View style={styles.historyLeft}>
                         <Text style={styles.historyDate}>
-                          {new Date(s.date).toLocaleDateString()} — {s.mode === 'exam' ? 'Exam' : 'Practice'} · {s.questionCount}Q
+                          {new Date(s.date).toLocaleDateString()} — {s.mode === 'exam' ? 'Exam' : 'Practice'} | {s.questionCount}Q
                         </Text>
                         <Text style={styles.historySubtitle}>
                           {answeredLabel} correct ({s.pct}%){s.quit ? ' (quit)' : ''}
@@ -213,16 +208,79 @@ export default function SessionHistoryScreen({ navigation }: Props) {
           </>
         )}
       </ScrollView>
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}
+          accessibilityLabel="Back"
+          accessibilityRole="button"
+        >
+          <Text style={styles.backBtnText}>←</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>📋 History</Text>
+        <View style={{ width: 44 }} />
+      </View>
+
+      {/* Tabs */}
+      <View style={styles.tabBar}>
+        {TABS.map(tab => {
+          const count =
+            tab.key === 'all'  ? scoreHistory.filter(s => resolveAnswered(s) > 0).length
+            : tab.key === 'exam' ? scoreHistory.filter(s => s.mode === 'exam' && resolveAnswered(s) > 0).length
+            : scoreHistory.filter(s => s.mode !== 'exam' && resolveAnswered(s) > 0).length;
+          return (
+            <TouchableOpacity
+              key={tab.key}
+              style={[styles.tab, activeTab === tab.key && styles.tabActive]}
+              onPress={() => scrollToTab(tab.key)}
+              accessibilityRole="tab"
+            >
+              <Text style={[styles.tabLabel, activeTab === tab.key && styles.tabLabelActive]}>
+                {tab.label}
+              </Text>
+              {count > 0 && (
+                <Text style={[styles.tabCount, activeTab === tab.key && styles.tabCountActive]}>
+                  {count}
+                </Text>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <View style={{ flex: 1 }}>
+        <FlatList
+          ref={flatListRef}
+          data={TABS.map(t => t.key)}
+          renderItem={renderPage}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={handleMomentumScrollEnd}
+          scrollEventThrottle={16}
+          keyExtractor={item => item}
+          getItemLayout={(_, index) => ({
+            length: screenWidth,
+            offset: screenWidth * index,
+            index,
+          })}
+        />
+      </View>
     </SafeAreaView>
   );
 }
 
 const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   safe:   { flex: 1, backgroundColor: colors.awsDark },
-  scroll: { flex: 1 },
+  scroll: { flex: 1, backgroundColor: colors.background },
   scrollContent: { paddingHorizontal: 16, paddingTop: 16 },
 
-  // ── Header ───────────────────────────────────────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -246,7 +304,6 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     fontWeight: '700',
   },
 
-  // ── Tabs ─────────────────────────────────────────────────────────────────
   tabBar: {
     flexDirection: 'row',
     backgroundColor: colors.awsDark,
@@ -278,7 +335,6 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.15)',
   },
 
-  // ── Empty state ──────────────────────────────────────────────────────────
   emptyCard: {
     marginTop: 60,
     alignItems: 'center',
@@ -286,16 +342,16 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     gap: 12,
   },
   emptyIcon:     { fontSize: 48 },
-  emptyTitle:    { color: '#fff', fontSize: 18, fontWeight: '700', textAlign: 'center' },
+  emptyTitle:    { color: colors.textPrimary, fontSize: 18, fontWeight: '700', textAlign: 'center' },
   emptySubtitle: { color: colors.textSecondary, fontSize: 14, textAlign: 'center', lineHeight: 20 },
 
-  // ── Session list card ────────────────────────────────────────────────────
   card: {
     backgroundColor: colors.cardBg,
     borderRadius: 14,
     overflow: 'hidden',
     marginBottom: 12,
-    ...shadow(colors.awsDark, 4, 0.18, 8),
+    ...shadow('#000', 1, 0.08, 6),
+    elevation: 2,
   },
   divider: { height: 1, backgroundColor: colors.border, marginHorizontal: 16 },
   historyRow: {
@@ -311,7 +367,6 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   historyPct:      { fontSize: 16, fontWeight: '800', minWidth: 46, textAlign: 'right' },
   historyChevron:  { color: colors.textSecondary, fontSize: 20, marginLeft: 4 },
 
-  // ── Clear All ────────────────────────────────────────────────────────────
   clearRow: {
     flexDirection: 'row',
     alignItems: 'center',

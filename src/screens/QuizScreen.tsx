@@ -22,6 +22,7 @@ import { setExamResult } from '../utils/examResultStore';
 import { saveNoteForQuestion, getAllNotes } from '../utils/noteStore';
 import { addQuestionReport, QuestionReport } from '../utils/storage';
 import { updateSRRecord } from '../utils/spacedRepetition';
+import * as Haptics from 'expo-haptics';
 import { useTheme } from '../contexts/ThemeContext';
 import { ColorScheme } from '../constants/colors';
 import { cssVal, shadow, noShadow } from '../utils/styleUtils';
@@ -53,6 +54,8 @@ export default function QuizScreen({ navigation, route }: Props) {
   const [hotspotSelections, setHotspotSelections] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [lastResult, setLastResult] = useState<boolean | null>(null);
+  const [timedOut, setTimedOut] = useState(false);
+  const [showTimeoutModal, setShowTimeoutModal] = useState(false);
 
   const hotspotSelectionsRef = useRef<string[]>([]);
   hotspotSelectionsRef.current = hotspotSelections;
@@ -130,7 +133,7 @@ export default function QuizScreen({ navigation, route }: Props) {
   // ── Timer ────────────────────────────────────────────────────────────────
   const doSubmit = useCallback(
     (forced = false) => {
-      if (!displayQuestion) return;
+      if (!displayQuestion || (submitted && !forced)) return;
       const current = historyRef.current;
       const currentIdx = current.length;
       if (currentIdx >= totalQuestions) return;
@@ -142,8 +145,8 @@ export default function QuizScreen({ navigation, route }: Props) {
       // ── Structured hotspot: can be auto-graded ──────────────────────────
       if (q.is_hotspot && q.answer && Object.keys(q.options).length > 0) {
         const correctOrder = q.answer.split(',').map(s => s.trim().toUpperCase());
-        const hsSelections = hotspotSelectionsRef.current;
-        const isCorrect =
+        const hsSelections = forced ? [] : hotspotSelectionsRef.current;
+        const isCorrect = !forced &&
           correctOrder.length === hsSelections.length &&
           correctOrder.every(
             (c, i) => c === (hsSelections[i] ?? '').toUpperCase()
@@ -158,9 +161,35 @@ export default function QuizScreen({ navigation, route }: Props) {
           flagged: flagged.has(q.number),
         };
         setHistory(prev => [...prev, hsEntry]);
-        if (isCorrect) setScore(s => s + 1);
+
+        if (isCorrect) {
+          setScore(s => s + 1);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } else {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        }
+
         setLastResult(isCorrect);
         setSubmitted(true);
+        if (forced) setTimedOut(true);
+
+        if (forced) {
+          if (!config.studyMode) {
+             // In Test Mode timeout: quick transition to next after showing Time's Up
+             setTimeout(() => {
+                const updatedH = historyRef.current;
+                if (updatedH.length < totalQuestions) {
+                  setViewPos(updatedH.length);
+                } else {
+                  finishQuiz(false);
+                }
+             }, 1500);
+          } else {
+             setShowExplanation(true);
+          }
+          return;
+        }
+
         if (config.studyMode) setShowExplanation(true);
         if (config.mode === 'spaced') updateSRRecord(q.number, isCorrect ? 4 : 1).catch(() => {});
         return;
@@ -170,12 +199,12 @@ export default function QuizScreen({ navigation, route }: Props) {
       const correct = parseCorrectLetters(q.answer, q.is_multi);
       const userLetters = forced ? [] : selectedLetters;
 
-      const isCorrect = q.is_hotspot
+      const isCorrect = forced ? false : (q.is_hotspot
         ? null
         : q.is_multi
         ? correct.length === userLetters.length &&
           userLetters.every(l => correct.includes(l))
-        : userLetters[0] === correct[0];
+        : userLetters[0] === correct[0]);
 
       const entry: HistoryEntry = {
         questionNumber: q.number,
@@ -188,15 +217,42 @@ export default function QuizScreen({ navigation, route }: Props) {
       };
 
       setHistory(prev => [...prev, entry]);
-      if (isCorrect === true) setScore(s => s + 1);
-      setLastResult(isCorrect);
+      if (isCorrect === true) {
+        setScore(s => s + 1);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else if (isCorrect === false || forced) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
+
+      setLastResult(forced ? false : isCorrect);
       setSubmitted(true);
+      if (forced) {
+        setTimedOut(true);
+        setShowTimeoutModal(true);
+      }
+
+      if (forced) {
+        if (!config.studyMode) {
+          // Auto-advance in test mode after showing the overlay
+          setTimeout(() => {
+            setShowTimeoutModal(false);
+            const updatedH = historyRef.current;
+            if (updatedH.length < totalQuestions) {
+              setViewPos(updatedH.length);
+            } else {
+              finishQuiz(false);
+            }
+          }, 1800); // Slightly longer for the message to be read
+        }
+        return;
+      }
+
       if (config.studyMode && q.explanation) setShowExplanation(true);
       if (config.mode === 'spaced' && isCorrect !== null) {
         updateSRRecord(q.number, isCorrect ? 4 : 1).catch(() => {});
       }
     },
-    [displayQuestion, selectedLetters, config.indices, questions, totalQuestions, flagged]
+    [displayQuestion, selectedLetters, config.indices, questions, totalQuestions, flagged, config.studyMode, config.mode]
   );
   // Keep doSubmitRef in sync after the callback is (re)created
   doSubmitRef.current = doSubmit;
@@ -244,7 +300,7 @@ export default function QuizScreen({ navigation, route }: Props) {
   submitExamRef.current = submitExam;
 
   useEffect(() => {
-    if (!config.timed || timeLeft === null) return;
+    if (!config.timed || timeLeft === null || submitted || isReviewingPast) return;
     if (timeLeft <= 0) {
       doSubmitRef.current(true);
       return;
@@ -253,21 +309,22 @@ export default function QuizScreen({ navigation, route }: Props) {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  // intentional: doSubmitRef and timerRef are refs; refs are guaranteed stable and
-  // do not need to appear in the deps array.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft, config.timed]);
+  }, [timeLeft, config.timed, submitted, isReviewingPast]);
 
-  // Reset timer when advancing to new question
+  // Reset logic when moving to a DIFFERENT question
   useEffect(() => {
-    if (config.timed) {
-      setTimeLeft(config.timePerQuestion);
+    const isNewQuestion = viewPos === history.length;
+    if (isNewQuestion) {
+      if (config.timed) {
+        setTimeLeft(config.timePerQuestion);
+      }
+      setSubmitted(false);
+      setSelectedLetters([]);
+      setHotspotSelections([]);
+      setLastResult(null);
+      setTimedOut(false);
     }
-    setSubmitted(false);
-    setSelectedLetters([]);
-    setHotspotSelections([]);
-    setLastResult(null);
-  }, [currentPos, config.timed, config.timePerQuestion]);
+  }, [viewPos, config.timed, config.timePerQuestion, history.length]);
 
   // Close explanation modal when navigating between questions
   useEffect(() => {
@@ -528,11 +585,11 @@ export default function QuizScreen({ navigation, route }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
       {/* ── Top Header ── */}
       <View style={styles.header}>
         <Text style={styles.headerTitle} numberOfLines={1}>
-          AWS AI Practitioner · AIF-C01
+          AWS AI Practitioner | AIF-C01
         </Text>
         <View style={styles.headerRight}>
           {config.studyMode && (
@@ -638,7 +695,7 @@ export default function QuizScreen({ navigation, route }: Props) {
           onPress={() => setViewPos(currentPos)}
         >
           <Text style={styles.reviewBannerText}>
-            📋 Review Mode · Tap to return to current question
+            📋 Review Mode | Tap to return to current question
           </Text>
         </TouchableOpacity>
       )}
@@ -723,31 +780,36 @@ export default function QuizScreen({ navigation, route }: Props) {
               styles.feedbackBox,
               feedbackIsCorrect === true
                 ? styles.feedbackCorrect
-                : feedbackIsCorrect === false
+                : (feedbackIsCorrect === false || timedOut)
                 ? styles.feedbackWrong
                 : styles.feedbackNeutral,
             ]}
           >
-            {feedbackIsCorrect === true ? (
+            {timedOut ? (
+              <Text style={[styles.feedbackTitle, { color: colors.wrong }]}>
+                ⏰ Time's Up!
+              </Text>
+            ) : feedbackIsCorrect === true ? (
               <Text style={[styles.feedbackTitle, { color: colors.correct }]}>
                 ✓ Correct!
               </Text>
             ) : feedbackIsCorrect === false ? (
-              <>
-                <Text style={[styles.feedbackTitle, { color: colors.wrong }]}>
-                  ✗ Wrong
-                </Text>
+              <Text style={[styles.feedbackTitle, { color: colors.wrong }]}>
+                ✗ Wrong
+              </Text>
+            ) : (
+              <Text style={[styles.feedbackTitle, { color: colors.textSecondary }]}>
+                📋 Hotspot question
+              </Text>
+            )}
+
+            {(feedbackIsCorrect === false || timedOut) && (
                 <Text style={styles.feedbackSub}>
                   Correct answer:{' '}
                   <Text style={styles.feedbackAnswer}>
                     {correctLetters.join(', ')}
                   </Text>
                 </Text>
-              </>
-            ) : (
-              <Text style={[styles.feedbackTitle, { color: colors.textSecondary }]}>
-                📋 Hotspot question
-              </Text>
             )}
           </View>
         )}
@@ -869,7 +931,38 @@ export default function QuizScreen({ navigation, route }: Props) {
         correctAnswer={correctLetters.join(', ')}
         isCorrect={feedbackIsCorrect}
         onClose={() => setShowExplanation(false)}
+        questionText={displayQuestion.question}
+        optionsText={Object.entries(displayQuestion.options)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([letter, text]) => `${letter}. ${text}`)
+          .join('\n')}
       />
+
+      {/* ── Time's Up Modal ────────────────────────────────────────────────── */}
+      <Modal visible={showTimeoutModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalBox, { alignItems: 'center' }]}>
+            <Text style={{ fontSize: 40, marginBottom: 12 }}>⏰</Text>
+            <Text style={styles.modalTitle}>Time's Up!</Text>
+            <Text style={[styles.modalBody, { textAlign: 'center' }]}>
+              {config.studyMode
+                ? "You didn't answer this question in time. Let's review the explanation."
+                : "Moving to the next question..."}
+            </Text>
+            {config.studyMode && (
+              <TouchableOpacity
+                style={[styles.submitBtn, { width: '100%', marginTop: 10 }]}
+                onPress={() => {
+                  setShowTimeoutModal(false);
+                  setShowExplanation(true);
+                }}
+              >
+                <Text style={styles.submitBtnText}>Review Explanation</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* ── Exam Review Modal ── */}
       {showExamReview && (
@@ -1293,7 +1386,7 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     borderRadius: 8,
     backgroundColor: colors.background,
   },
-  flagIcon: { fontSize: 15 },
+  flagIcon: { fontSize: 15, color: colors.textPrimary },
   flagLabel: {
     fontSize: 12,
     fontWeight: '600',

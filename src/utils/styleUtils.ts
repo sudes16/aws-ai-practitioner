@@ -1,59 +1,62 @@
-import { Platform } from 'react-native';
+import { StyleSheet, ViewStyle, TextStyle } from 'react-native';
+import { ColorScheme } from '../constants/colors';
 
-/**
- * React Native Web CSS value workaround.
- *
- * RN's StyleSheet types do not accept CSS percentage strings or 'auto'
- * in some layout properties, but these values are valid at runtime on web.
- * Use cssVal() to centralise the cast rather than scattering `as any`.
- *
- * Usage: { width: cssVal(`${pct}%`) }
- */
-export const cssVal = (val: string | number): any => val;
+/** Simple shadow helper */
+export const shadow = (color: string, radius = 4, opacity = 0.1, elevation = 4): ViewStyle => ({
+  shadowColor: color,
+  shadowOffset: { width: 0, height: radius / 2 },
+  shadowOpacity: opacity,
+  shadowRadius: radius,
+  elevation,
+});
 
-// ─── Cross-platform shadow helper ────────────────────────────────────────────
-// shadow* style props are deprecated in React Native for Web (>= 0.19).
-// This helper emits `boxShadow` on web and the native shadow* props elsewhere.
+/** No-shadow helper */
+export const noShadow = (): ViewStyle => ({
+  shadowOpacity: 0,
+  elevation: 0,
+});
 
-function hexToRgba(hex: string, alpha: number): string {
-  const h = hex.replace('#', '');
-  const len = h.length === 3 ? 1 : 2;
-  const r = parseInt(len === 1 ? h[0] + h[0] : h.slice(0, 2), 16);
-  const g = parseInt(len === 1 ? h[1] + h[1] : h.slice(2, 4), 16);
-  const b = parseInt(len === 1 ? h[2] + h[2] : h.slice(4, 6), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
-}
+/** CSS value helper for web compatibility */
+export const cssVal = (val: string | number) => val as any;
 
-/**
- * Returns platform-appropriate shadow styles.
- * Web  → boxShadow string (no deprecation warning)
- * Native → shadowColor / shadowOffset / shadowOpacity / shadowRadius
- *
- * Usage (inside StyleSheet.create):
- *   someStyle: { flex: 1, ...shadow('#000', 2, 0.08, 6), elevation: 3 }
- */
-export function shadow(
-  color: string,
-  offsetY: number,
-  opacity: number,
-  radius: number,
-  offsetX = 0,
-): any {
-  return Platform.select({
-    web: { boxShadow: `${offsetX}px ${offsetY}px ${radius}px ${hexToRgba(color, opacity)}` },
-    default: {
-      shadowColor: color,
-      shadowOffset: { width: offsetX, height: offsetY },
-      shadowOpacity: opacity,
-      shadowRadius: radius,
-    },
-  });
-}
-
-/** Suppresses an inherited shadow (e.g. on a disabled variant style). */
-export function noShadow(): any {
-  return Platform.select({
-    web: { boxShadow: 'none' },
-    default: { shadowOpacity: 0 },
-  });
-}
+/** Shared UI Constants */
+export const SHARED_STYLES = (colors: ColorScheme) => StyleSheet.create({
+  card: {
+    backgroundColor: colors.cardBg,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadow('#000', 1, 0.06, 4),
+  },
+  header: {
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.awsDark,
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 8,
+    marginTop: 4,
+    paddingHorizontal: 4,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.border,
+    opacity: 0.5,
+  }
+});

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,12 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { ColorScheme } from '../constants/colors';
 import { stripMarkdown } from '../utils/quizEngine';
+import { getAiExplanation, getAiKey } from '../utils/aiService';
 
 interface Props {
   visible: boolean;
@@ -17,6 +19,9 @@ interface Props {
   correctAnswer: string;
   isCorrect: boolean | null;
   onClose: () => void;
+  // Optional context for AI
+  questionText?: string;
+  optionsText?: string;
 }
 
 export default function ExplanationModal({
@@ -25,15 +30,47 @@ export default function ExplanationModal({
   correctAnswer,
   isCorrect,
   onClose,
+  questionText,
+  optionsText,
 }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+
+  const [aiExplanation, setAiExplanation] = useState<string | null>(null);
+  const [loadingAi, setLoadingAi] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  const handleFetchAi = async () => {
+    if (!questionText || !optionsText) return;
+
+    const key = await getAiKey();
+    if (!key) {
+      setAiError("To use AI insights, please add your Gemini API Key in the Settings tab.");
+      return;
+    }
+
+    setAiError(null);
+    setLoadingAi(true);
+    try {
+      const result = await getAiExplanation(questionText, optionsText, correctAnswer);
+      setAiExplanation(result);
+    } finally {
+      setLoadingAi(false);
+    }
+  };
+
+  const handleClose = () => {
+    setAiExplanation(null);
+    setAiError(null);
+    onClose();
+  };
+
   return (
     <Modal
       visible={visible}
       transparent
       animationType="slide"
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <View style={styles.overlay}>
         <View style={styles.sheet}>
@@ -54,7 +91,7 @@ export default function ExplanationModal({
                 </View>
               )}
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn} accessibilityLabel="Close explanation" accessibilityRole="button">
+            <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
               <Text style={styles.closeBtnText}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -70,10 +107,38 @@ export default function ExplanationModal({
             <Text style={styles.explanationText}>
               {stripMarkdown(explanation)}
             </Text>
+
+            {aiExplanation && (
+              <View style={styles.aiBox}>
+                <Text style={styles.aiTitle}>✨ Gemini AI Insights</Text>
+                <Text style={styles.aiText}>{aiExplanation}</Text>
+              </View>
+            )}
+
+            {aiError && (
+              <View style={[styles.aiBox, { borderColor: colors.wrong + '60' }]}>
+                <Text style={[styles.aiTitle, { color: colors.wrong }]}>🔑 Setup Required</Text>
+                <Text style={styles.aiText}>{aiError}</Text>
+              </View>
+            )}
+
+            {loadingAi && (
+              <View style={styles.aiLoading}>
+                <ActivityIndicator color={colors.awsOrange} />
+                <Text style={styles.aiLoadingText}>Gemini is thinking...</Text>
+              </View>
+            )}
+
+            {!aiExplanation && !loadingAi && questionText && (
+              <TouchableOpacity style={styles.aiBtn} onPress={handleFetchAi}>
+                <Text style={styles.aiBtnText}>💡 Deep Dive with AI</Text>
+              </TouchableOpacity>
+            )}
+
             <View style={{ height: 24 }} />
           </ScrollView>
 
-          <TouchableOpacity style={styles.doneBtn} onPress={onClose} accessibilityLabel="Close explanation" accessibilityRole="button">
+          <TouchableOpacity style={styles.doneBtn} onPress={handleClose}>
             <Text style={styles.doneBtnText}>Close</Text>
           </TouchableOpacity>
         </View>
@@ -170,9 +235,50 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     fontSize: 15,
     color: colors.textPrimary,
     lineHeight: 24,
-    flexShrink: 1,
-    // break long URLs so they don't cause horizontal overflow
-    ...({ overflowWrap: 'break-word', wordBreak: 'break-word' } as object),
+  },
+  aiBox: {
+    marginTop: 20,
+    padding: 16,
+    backgroundColor: colors.awsOrange + '15',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.awsOrange + '40',
+  },
+  aiTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.awsOrange,
+    marginBottom: 8,
+  },
+  aiText: {
+    fontSize: 14,
+    color: colors.textPrimary,
+    lineHeight: 22,
+    fontStyle: 'italic',
+  },
+  aiBtn: {
+    marginTop: 20,
+    paddingVertical: 12,
+    backgroundColor: colors.background,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.awsOrange,
+    alignItems: 'center',
+  },
+  aiBtnText: {
+    color: colors.awsOrange,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  aiLoading: {
+    marginTop: 24,
+    alignItems: 'center',
+    gap: 10,
+  },
+  aiLoadingText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontWeight: '500',
   },
   doneBtn: {
     marginHorizontal: 16,

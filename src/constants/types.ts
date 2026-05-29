@@ -83,7 +83,7 @@ export type RootStackParamList = {
   PrivacyPolicy: undefined;
   Help: undefined;
   Settings: undefined;
-  Analytics: undefined;
+  Insights: undefined;
   SessionHistory: undefined;
   ExamResult: undefined;
   Reports: undefined;
