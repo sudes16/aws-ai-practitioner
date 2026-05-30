@@ -1103,36 +1103,59 @@ export default function QuizScreen({ navigation, route }: Props) {
             {/* Filter chips */}
             <View style={styles.examFilterRow}>
               <TouchableOpacity
-                style={[styles.examFilterChip, examReviewFilters.size === 0 && { borderColor: colors.awsDark, backgroundColor: colors.awsDark + '18' }]}
+                style={[
+                  styles.examFilterChip,
+                  examReviewFilters.size === 0 && { borderColor: colors.awsOrange, backgroundColor: colors.awsOrange + '15' }
+                ]}
                 onPress={() => setExamReviewFilters(new Set())}
               >
-                <Text style={[styles.examFilterChipText, { color: examReviewFilters.size === 0 ? colors.awsDark : colors.textSecondary }]}>
+                <Text style={[styles.examFilterChipText, { color: examReviewFilters.size === 0 ? colors.awsOrange : colors.textSecondary }]}>
                   All {totalQuestions}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.examFilterChip, examReviewFilters.has('answered') && { borderColor: colors.correct, backgroundColor: colors.correctBg }]}
+                style={[
+                  styles.examFilterChip,
+                  examReviewFilters.has('answered') && { borderColor: colors.correct, backgroundColor: colors.correctBg }
+                ]}
                 onPress={() => toggleReviewFilter('answered')}
               >
-                <Text style={[styles.examFilterChipText, { color: colors.correct }]}>✓ {reviewAnsweredCount} answered</Text>
+                <Text style={[styles.examFilterChipText, { color: colors.correct }]}>
+                  ✓ {reviewAnsweredCount} answered
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.examFilterChip, examReviewFilters.has('flagged') && { borderColor: colors.awsOrange, backgroundColor: colors.awsOrange + '18' }]}
+                style={[
+                  styles.examFilterChip,
+                  examReviewFilters.has('flagged') && { borderColor: colors.awsOrange, backgroundColor: colors.awsOrange + '18' }
+                ]}
                 onPress={() => toggleReviewFilter('flagged')}
               >
-                <Text style={[styles.examFilterChipText, { color: colors.awsOrange }]}>⚑ {flagged.size} flagged</Text>
+                <Text style={[styles.examFilterChipText, { color: colors.awsOrange }]}>
+                  ⚑ {flagged.size} flagged
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.examFilterChip, examReviewFilters.has('noted') && { borderColor: colors.btnSecondary, backgroundColor: colors.optionSelected }]}
+                style={[
+                  styles.examFilterChip,
+                  examReviewFilters.has('noted') && { borderColor: colors.btnSecondary, backgroundColor: colors.btnSecondary + '18' }
+                ]}
                 onPress={() => toggleReviewFilter('noted')}
               >
-                <Text style={[styles.examFilterChipText, { color: colors.btnSecondary }]}>✎ {reviewNotedCount} noted</Text>
+                <Text style={[styles.examFilterChipText, { color: colors.btnSecondary }]}>
+                  ✎ {reviewNotedCount} noted
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.examFilterChip, examReviewFilters.has('remaining') && { borderColor: colors.textSecondary, backgroundColor: colors.background }]}
+                style={[
+                  styles.examFilterChip,
+                  examReviewFilters.has('remaining') && { borderColor: colors.textSecondary, backgroundColor: colors.background }
+                ]}
                 onPress={() => toggleReviewFilter('remaining')}
               >
-                <Text style={[styles.examFilterChipText, { color: colors.textSecondary }]}>□ {reviewRemainingCount} remaining</Text>
+                <Text style={[styles.examFilterChipText, { color: colors.textSecondary }]}>
+                  □ {reviewRemainingCount} remaining
+                </Text>
               </TouchableOpacity>
             </View>
 
@@ -1993,8 +2016,8 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     borderWidth: 2,
   },
   examTileAnswered: {
-    backgroundColor: colors.awsDark,
-    borderColor: colors.awsDark,
+    backgroundColor: colors.awsOrange,
+    borderColor: colors.awsOrange,
   },
   examTileSkipped: {
     backgroundColor: colors.background,
@@ -2011,7 +2034,7 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   examTileNum: {
     fontSize: 12,
     fontWeight: '700',
-    color: colors.textSecondary,
+    color: colors.textPrimary,
   },
   examTileNumLight: {
     color: '#fff',
@@ -2078,6 +2101,6 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     fontWeight: '700',
   },
   examTileDimmed: {
-    opacity: 0.2,
+    opacity: 0.35,
   },
 });

@@ -5,9 +5,11 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import * as Haptics from 'expo-haptics';
 import { RootStackParamList, HistoryEntry, PASS_THRESHOLD_PCT } from '../constants/types';
 import { useTheme } from '../contexts/ThemeContext';
 import { shadow } from '../utils/styleUtils';
@@ -50,12 +52,26 @@ function ScoreCircle({
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const pass = pct >= PASS_THRESHOLD_PCT;
-  const color = pass ? colors.scorePass : pct >= 50 ? colors.awsOrange : colors.scoreFail;
+  const isPerfect = pct === 100;
+
+  const color = isPerfect
+    ? '#FFD700' // Gold
+    : pass
+      ? colors.scorePass
+      : pct >= 50
+        ? colors.awsOrange
+        : colors.scoreFail;
+
   return (
     <View style={[styles.circleWrap, { borderColor: color }]}>
       <Text style={[styles.circleScore, { color }]}>{score}</Text>
       <Text style={styles.circleDivider}>/{total}</Text>
       <Text style={[styles.circlePct, { color }]}>{pct.toFixed(1)}%</Text>
+      {isPerfect && (
+        <View style={styles.perfectBadge}>
+          <Text style={styles.perfectBadgeText}>PERFECT</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -81,8 +97,15 @@ export default function ResultScreen({ navigation, route }: Props) {
   const flaggedCount = history.filter(h => h.flagged).length;
   const unanswered   = total - answered;
 
-  // Persist mastered questions status to AsyncStorage
+  // Persist mastered questions status to AsyncStorage & Trigger Haptics
   useEffect(() => {
+    // Haptics Feedback
+    if (pass) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+
     const correctNums = history
       .filter(h => h.correct === true)
       .map(h => h.questionNumber);
@@ -130,18 +153,33 @@ export default function ResultScreen({ navigation, route }: Props) {
     });
   }, [history]);
 
+  const handleShareResult = async () => {
+    const message = `🚀 I just scored ${pct.toFixed(1)}% on my AWS AI Practitioner practice quiz! ☁️\n\nResult: ${correct}/${total} Correct\nStatus: ${pass ? 'PASSED ✅' : 'Still studying 📚'}\n\nPrep is going great with this app! #AWS #CloudComputing`;
+    try {
+      await Share.share({ message });
+    } catch (error) {
+      console.log('Share error:', error);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>
-          {quit ? 'Quiz Summary' : 'Exam Complete'}
-        </Text>
-        {quit && (
-          <Text style={styles.headerSub}>
-            {answered} of {total} answered
+        <View style={{ width: 36 }} />
+        <View style={{ flex: 1, alignItems: 'center' }}>
+          <Text style={styles.headerTitle}>
+            {quit ? 'Quiz Summary' : 'Exam Complete'}
           </Text>
-        )}
+          {quit && (
+            <Text style={styles.headerSub}>
+              {answered} of {total} answered
+            </Text>
+          )}
+        </View>
+        <TouchableOpacity onPress={handleShareResult} style={styles.shareBtnHeader}>
+          <Text style={{ fontSize: 20 }}>📤</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -328,10 +366,19 @@ function StatBox({
 const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.awsDark },
   header: {
+    flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 16,
     paddingHorizontal: 16,
     backgroundColor: colors.awsDark,
+  },
+  shareBtnHeader: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 22,
@@ -408,6 +455,21 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     marginTop: 1,
+  },
+  perfectBadge: {
+    position: 'absolute',
+    bottom: -12,
+    backgroundColor: '#FFD700',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.cardBg,
+  },
+  perfectBadgeText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#000',
   },
   passBadge: {
     paddingHorizontal: 16,

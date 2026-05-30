@@ -5,9 +5,11 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import * as Haptics from 'expo-haptics';
 
 import { RootStackParamList, DOMAIN_LABELS, PASS_THRESHOLD_PCT } from '../constants/types';
 import { getDomainForIndex, EXAM_DOMAIN_COUNTS, EXAM_DOMAIN_PCT, EXAM_TOTAL_QS } from '../utils/quizEngine';
@@ -32,6 +34,13 @@ export default function ExamResultScreen({ navigation }: Props) {
   const passed = totalCorrect / EXAM_TOTAL_QS >= PASS_THRESHOLD_PCT / 100;
 
   useEffect(() => {
+    // Haptics Feedback
+    if (passed) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+
     const correctNums = history.filter(h => h.correct === true).map(h => h.questionNumber);
     const wrongNums = history.filter(h => h.correct === false).map(h => h.questionNumber);
 
@@ -98,12 +107,29 @@ export default function ExamResultScreen({ navigation }: Props) {
     };
   });
 
+  const handleShareResult = async () => {
+    const message = `🎯 I just completed a full AWS AI Practitioner Mock Exam with a score of ${percentage}%! 🚀☁️\n\nResult: ${totalCorrect}/${EXAM_TOTAL_QS} Correct\nStatus: ${passed ? 'PASSED ✅' : 'Working hard 📚'}\n\nPreparing with this study tool! #AWS #Certification`;
+    try {
+      await Share.share({ message });
+    } catch (error) {
+      console.log('Share error:', error);
+    }
+  };
+
+  const isPerfect = percentage === 100;
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
       {/* ── Header ── */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Exam Complete</Text>
-        <Text style={styles.headerSub}>AWS AI Practitioner | AIF-C01</Text>
+        <View style={{ width: 44 }} />
+        <View style={{ flex: 1, alignItems: 'center' }}>
+          <Text style={styles.headerTitle}>Exam Complete</Text>
+          <Text style={styles.headerSub}>AWS AI Practitioner | AIF-C01</Text>
+        </View>
+        <TouchableOpacity onPress={handleShareResult} style={styles.shareBtnHeader}>
+          <Text style={{ fontSize: 20 }}>📤</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -111,15 +137,23 @@ export default function ExamResultScreen({ navigation }: Props) {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Score Card ── */}
-        <View style={[styles.scoreCard, passed ? styles.scoreCardPass : styles.scoreCardFail]}>
-          <Text style={styles.scoreNum}>
+        <View style={[
+          styles.scoreCard,
+          passed ? styles.scoreCardPass : styles.scoreCardFail,
+          isPerfect && styles.scoreCardPerfect
+        ]}>
+          <Text style={[styles.scoreNum, isPerfect && { color: '#FFD700' }]}>
             {totalCorrect}
             <Text style={styles.scoreOutOf}>/{EXAM_TOTAL_QS}</Text>
           </Text>
-          <Text style={styles.scorePct}>{percentage}%</Text>
-          <View style={[styles.passBadge, passed ? styles.passBadgeGreen : styles.passBadgeRed]}>
-            <Text style={styles.passBadgeText}>
-              {passed ? '✓ Pass' : '✗ Did not pass'}
+          <Text style={[styles.scorePct, isPerfect && { color: '#FFD700' }]}>{percentage}%</Text>
+          <View style={[
+            styles.passBadge,
+            passed ? styles.passBadgeGreen : styles.passBadgeRed,
+            isPerfect && { backgroundColor: '#FFD700' }
+          ]}>
+            <Text style={[styles.passBadgeText, isPerfect && { color: '#000' }]}>
+              {isPerfect ? '⭐ PERFECT SCORE' : passed ? '✓ Pass' : '✗ Did not pass'}
             </Text>
           </View>
           <Text style={styles.passNote}>Pass mark: 70% ({Math.ceil(EXAM_TOTAL_QS * PASS_THRESHOLD_PCT / 100)}/{EXAM_TOTAL_QS})</Text>
@@ -173,10 +207,46 @@ export default function ExamResultScreen({ navigation }: Props) {
       {/* ── Fixed Footer ── */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={styles.homeBtn}
+          style={[styles.homeBtn, styles.footerBtnHalf]}
           onPress={() => navigation.navigate('Home')}
         >
-          <Text style={styles.homeBtnText}>🏠 Home</Text>
+          <Text style={styles.homeBtnText}>✕ Close</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.reviewBtn,
+            styles.footerBtnHalf,
+            totalCorrect === EXAM_TOTAL_QS && { backgroundColor: colors.correct }
+          ]}
+          onPress={() => {
+            const incorrectCount = history.filter(h => h.correct === false).length;
+            if (incorrectCount > 0) {
+              const wrongIndices = history
+                .filter(h => h.correct === false)
+                .map(h => h.questionIndex);
+              navigation.replace('Quiz', {
+                config: {
+                  mode: 'random',
+                  fromQ: 1,
+                  toQ: 65,
+                  count: wrongIndices.length,
+                  timed: false,
+                  timePerQuestion: 60,
+                  indices: wrongIndices,
+                  questionType: 'all',
+                  domain: 0,
+                  studyMode: true, // Auto-study for retrying wrong ones
+                  isExam: false,
+                },
+              });
+            } else {
+              navigation.navigate('Review', { history });
+            }
+          }}
+        >
+          <Text style={styles.reviewBtnText}>
+            {totalCorrect === EXAM_TOTAL_QS ? '📋 Review Answers' : `↺ Retry Wrong (${EXAM_TOTAL_QS - totalCorrect})`}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -187,10 +257,19 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.awsDark },
 
   header: {
+    flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 20,
     paddingHorizontal: 16,
     backgroundColor: colors.awsDark,
+  },
+  shareBtnHeader: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 22,
@@ -222,6 +301,11 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   scoreCardFail: {
     backgroundColor: colors.wrongBg,
     borderColor: colors.wrong,
+  },
+  scoreCardPerfect: {
+    backgroundColor: colors.optionSelected,
+    borderColor: '#FFD700',
+    borderWidth: 3,
   },
   scoreNum: {
     fontSize: 64,
@@ -342,21 +426,39 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
 
   // ── Footer ──────────────────────────────────────────────────────────────
   footer: {
+    flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: colors.background,
     borderTopWidth: 1,
     borderTopColor: colors.border,
+    gap: 12,
   },
-  homeBtn: {
+  footerBtnHalf: {
+    flex: 1,
+  },
+  reviewBtn: {
     paddingVertical: 14,
     borderRadius: 12,
     backgroundColor: colors.awsDark,
     alignItems: 'center',
   },
+  reviewBtnText: {
+    color: colors.textLight,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  homeBtn: {
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.border,
+  },
   homeBtnText: {
-    color: '#fff',
-    fontWeight: '800',
-    fontSize: 16,
+    color: colors.textPrimary,
+    fontWeight: '700',
+    fontSize: 14,
   },
 });

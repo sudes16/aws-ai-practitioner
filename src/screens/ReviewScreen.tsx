@@ -22,13 +22,14 @@ import { useNotes } from '../contexts/NotesContext';
 import ExplanationModal from '../components/ExplanationModal';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Review'>;
-type Filter = 'all' | 'correct' | 'wrong' | 'flagged';
+type Filter = 'all' | 'correct' | 'wrong' | 'flagged' | 'noted';
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'correct', label: '✓ Correct' },
   { key: 'wrong', label: '✗ Wrong' },
   { key: 'flagged', label: '🚩 Flagged' },
+  { key: 'noted', label: '✎ Noted' },
 ];
 
 export default function ReviewScreen({ navigation, route }: Props) {
@@ -201,6 +202,7 @@ export default function ReviewScreen({ navigation, route }: Props) {
       if (filterKey === 'correct') return entry.correct === true;
       if (filterKey === 'wrong') return entry.correct === false;
       if (filterKey === 'flagged') return entry.flagged;
+      if (filterKey === 'noted') return !!notesMap[entry.questionNumber];
       return true;
     });
 

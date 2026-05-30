@@ -191,9 +191,6 @@ export default function SessionHistoryScreen({ navigation }: Props) {
                           {answeredLabel} correct ({s.pct}%){s.quit ? ' (quit)' : ''}
                         </Text>
                       </View>
-                      {record && record.history.some(h => notesMap[h.questionNumber]) && (
-                        <Text style={styles.noteBadge}>✎</Text>
-                      )}
                       <Text style={[styles.historyPct, { color: s.pct >= 70 ? colors.correct : colors.wrong }]}>
                         {s.pct}%
                       </Text>

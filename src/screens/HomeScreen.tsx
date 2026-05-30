@@ -35,16 +35,18 @@ const Q_TYPE_OPTIONS: { key: QType; emoji: string; label: string; sub: string }[
   { key: 'hotspot', emoji: '⇄', label: 'Matching',        sub: 'Ordering & matching' },
 ];
 
-const allQuestions = getAllQuestions();
-const hotspotCount = allQuestions.filter(q => q.is_hotspot).length;
-
 export default function HomeScreen({ navigation }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const shared = useMemo(() => SHARED_STYLES(colors), [colors]);
   const { width: screenWidth } = useWindowDimensions();
 
-  const total = getTotalCount();
+  // Fresh questions on every mount/render
+  const allQuestions = getAllQuestions();
+  const total = allQuestions.length;
+  const hotspotCount = useMemo(() => allQuestions.filter(q => q.is_hotspot).length, [allQuestions]);
+  const mcCount = total - hotspotCount;
+
   const [fromQ, setFromQ]           = useState('1');
   const [toQ, setToQ]               = useState(String(total || 1));
   const [count, setCount]           = useState(String(total || 20));
@@ -78,7 +80,7 @@ export default function HomeScreen({ navigation }: Props) {
       return acc;
     }, []);
     return unmastered.length;
-  }, [questionType, domain, masteredNumbers]);
+  }, [questionType, domain, masteredNumbers, allQuestions]);
 
   const calcPoolSize = useCallback((qt: QType | null, d: DomainFilter, fq: string, tq: string) => {
     const from = parseInt(fq) || 1;
@@ -91,7 +93,7 @@ export default function HomeScreen({ navigation }: Props) {
     else if (qt === 'hotspot') pool = pool.filter(i =>  allQuestions[i].is_hotspot);
     if (d !== 0) pool = pool.filter(i => getDomainForIndex(i) === d);
     return pool.length;
-  }, [total]);
+  }, [total, allQuestions]);
 
   const poolSize = useMemo(
     () => calcPoolSize(questionType, domain, fromQ, toQ),
@@ -300,8 +302,6 @@ export default function HomeScreen({ navigation }: Props) {
       setLoading(false);
     }
   };
-
-  const mcCount = total - hotspotCount;
 
   const handleMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (isInternalScroll.current) return;
