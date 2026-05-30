@@ -475,8 +475,8 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   domainPctBadge: { fontSize: 10, fontWeight: '800', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' },
   domainBarTrack: { height: 8, borderRadius: 4, backgroundColor: colors.border, overflow: 'hidden', marginBottom: 6 },
   domainBarFill: { height: 8, borderRadius: 4 },
-  domainPracticeBtn: { alignSelf: 'flex-end', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, backgroundColor: colors.awsDark + '20', borderWidth: 1, borderColor: colors.awsDark },
-  domainPracticeBtnText: { fontSize: 11, fontWeight: '700', color: colors.awsDark },
+  domainPracticeBtn: { alignSelf: 'flex-end', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, backgroundColor: colors.background, borderWidth: 1.5, borderColor: colors.awsOrange },
+  domainPracticeBtnText: { fontSize: 11, fontWeight: '800', color: colors.awsOrange },
   // ── Modal styles ──
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' },
   modalBox: { width: '85%', backgroundColor: colors.cardBg, borderRadius: 14, padding: 20 },

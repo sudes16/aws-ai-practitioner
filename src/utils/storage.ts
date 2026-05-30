@@ -24,6 +24,17 @@ export const addMasteredQuestions = async (numbers: number[]): Promise<void> => 
   }
 };
 
+export const removeMasteredQuestions = async (numbers: number[]): Promise<void> => {
+  try {
+    const existing = await getMasteredQuestions();
+    const set = new Set(existing);
+    numbers.forEach(n => set.delete(n));
+    await AsyncStorage.setItem(MASTERED_KEY, JSON.stringify(Array.from(set)));
+  } catch {
+    // silently fail
+  }
+};
+
 export const getMasteredCount = async (): Promise<number> => {
   const m = await getMasteredQuestions();
   return m.length;

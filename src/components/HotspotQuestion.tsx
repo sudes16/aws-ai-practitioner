@@ -186,6 +186,9 @@ export default function HotspotQuestion({
                     ]}
                     onPress={() => handleSelect(openStep!, letter)}
                     activeOpacity={0.75}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Option ${letter}: ${text}`}
+                    accessibilityState={{ selected: isSelected }}
                   >
                     <View
                       style={[

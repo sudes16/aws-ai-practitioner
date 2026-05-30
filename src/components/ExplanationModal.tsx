@@ -91,7 +91,7 @@ export default function ExplanationModal({
                 </View>
               )}
             </View>
-            <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
+            <TouchableOpacity onPress={handleClose} style={styles.closeBtn} accessibilityLabel="Close explanation" accessibilityRole="button">
               <Text style={styles.closeBtnText}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -138,7 +138,7 @@ export default function ExplanationModal({
             <View style={{ height: 24 }} />
           </ScrollView>
 
-          <TouchableOpacity style={styles.doneBtn} onPress={handleClose}>
+          <TouchableOpacity style={styles.doneBtn} onPress={handleClose} accessibilityLabel="Close explanation" accessibilityRole="button">
             <Text style={styles.doneBtnText}>Close</Text>
           </TouchableOpacity>
         </View>

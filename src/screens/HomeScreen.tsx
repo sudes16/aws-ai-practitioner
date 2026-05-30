@@ -127,6 +127,11 @@ export default function HomeScreen({ navigation }: Props) {
     if (poolSize > 0 && c > poolSize) setCount(String(poolSize));
   }, [poolSize]);
 
+  // Sync toQ with total when the question bank grows (e.g. after OTA update)
+  useEffect(() => {
+    setToQ(String(total));
+  }, [total]);
+
   const [profile, setProfile]           = useState<UserProfile | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [obName, setObName]             = useState('');
@@ -438,7 +443,9 @@ export default function HomeScreen({ navigation }: Props) {
                 <Text style={[styles.typeBtnEmoji, studyMode && styles.typeBtnLabelActive]}>{studyMode ? '✧' : '✎'}</Text>
                 <View style={styles.typeBtnTextGroup}>
                   <Text style={[styles.typeBtnLabel, studyMode && styles.typeBtnLabelActive]}>{studyMode ? 'Study Mode' : 'Test Mode'}</Text>
-                  <Text style={[styles.typeBtnSub, studyMode && styles.typeBtnSubActive]}>{studyMode ? 'Auto explanation' : 'Manual explanation'}</Text>
+                  {studyMode && (
+                    <Text style={[styles.typeBtnSub, styles.typeBtnSubActive]}>Guided learning</Text>
+                  )}
                 </View>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.typeBtn, timed && styles.typeBtnActive]} onPress={() => setTimed(v => !v)}>

@@ -12,7 +12,7 @@ import { RootStackParamList, HistoryEntry, PASS_THRESHOLD_PCT } from '../constan
 import { useTheme } from '../contexts/ThemeContext';
 import { shadow } from '../utils/styleUtils';
 import { ColorScheme } from '../constants/colors';
-import { addMasteredQuestions, addScoreSession, saveSessionRecord } from '../utils/storage';
+import { addMasteredQuestions, removeMasteredQuestions, addScoreSession, saveSessionRecord } from '../utils/storage';
 import { getDomainForIndex } from '../utils/quizEngine';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Result'>;
@@ -81,14 +81,18 @@ export default function ResultScreen({ navigation, route }: Props) {
   const flaggedCount = history.filter(h => h.flagged).length;
   const unanswered   = total - answered;
 
-  // Persist mastered questions (answered correctly) to AsyncStorage
+  // Persist mastered questions status to AsyncStorage
   useEffect(() => {
     const correctNums = history
       .filter(h => h.correct === true)
       .map(h => h.questionNumber);
-    if (correctNums.length > 0) {
-      addMasteredQuestions(correctNums);
-    }
+    const wrongNums = history
+      .filter(h => h.correct === false)
+      .map(h => h.questionNumber);
+
+    if (correctNums.length > 0) addMasteredQuestions(correctNums);
+    if (wrongNums.length > 0) removeMasteredQuestions(wrongNums);
+
     const answeredCount = history.filter(h => h.correct !== null).length;
     // Quit sessions are penalised against the full pool (score/total), not just what was answered
     const pct = quit
@@ -232,38 +236,42 @@ export default function ResultScreen({ navigation, route }: Props) {
           style={[styles.footerBtn, styles.footerBtnHome, styles.footerBtnHalf]}
           onPress={() => navigation.replace('Home')}
         >
-          <Text style={styles.footerBtnHomeText}>🏠 Home</Text>
+          <Text style={styles.footerBtnHomeText}>✕ Close</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[
             styles.footerBtn,
             styles.footerBtnReview,
             styles.footerBtnHalf,
-            incorrect === 0 && styles.footerBtnDisabled,
+            answered === 0 && styles.footerBtnDisabled,
           ]}
-          disabled={incorrect === 0}
+          disabled={answered === 0}
           onPress={() => {
-            const wrongIndices = history
-              .filter(h => h.correct === false)
-              .map(h => h.questionIndex);
-            navigation.replace('Quiz', {
-              config: {
-                mode: config?.mode ?? 'sequential',
-                fromQ: 1,
-                toQ: 65,
-                count: wrongIndices.length,
-                timed: config?.timed ?? false,
-                timePerQuestion: config?.timePerQuestion ?? 60,
-                indices: wrongIndices,
-                questionType: config?.questionType ?? 'all',
-                domain: config?.domain ?? 0,
-                studyMode: config?.studyMode ?? false,
-              },
-            });
+            if (incorrect > 0) {
+              const wrongIndices = history
+                .filter(h => h.correct === false)
+                .map(h => h.questionIndex);
+              navigation.replace('Quiz', {
+                config: {
+                  mode: config?.mode ?? 'sequential',
+                  fromQ: 1,
+                  toQ: total,
+                  count: wrongIndices.length,
+                  timed: config?.timed ?? false,
+                  timePerQuestion: config?.timePerQuestion ?? 60,
+                  indices: wrongIndices,
+                  questionType: config?.questionType ?? 'all',
+                  domain: config?.domain ?? 0,
+                  studyMode: config?.studyMode ?? false,
+                },
+              });
+            } else {
+              navigation.navigate('Review', { history });
+            }
           }}
         >
-          <Text style={[styles.footerBtnReviewText, incorrect === 0 && styles.footerBtnDisabledText]}>
-            ↺ Retry Wrong ({incorrect})
+          <Text style={[styles.footerBtnReviewText, answered === 0 && styles.footerBtnDisabledText]}>
+            {incorrect > 0 ? `↺ Retry Wrong (${incorrect})` : '📋 Review Answers'}
           </Text>
         </TouchableOpacity>
       </View>

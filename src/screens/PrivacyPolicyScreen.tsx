@@ -15,9 +15,9 @@ import { ColorScheme } from '../constants/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PrivacyPolicy'>;
 
-const LAST_UPDATED = 'May 27, 2026';
+const LAST_UPDATED = 'May 29, 2026';
 const APP_NAME = 'AWS AI Practitioner – AIF-C01 Quiz';
-const CONTACT_EMAIL = 'sudes16@gmail.com';
+const CONTACT_EMAIL = 'sudesh6112@gmail.com';
 
 interface Section {
   title: string;
@@ -47,7 +47,8 @@ const SECTIONS: Section[] = [
     body:
       'The app offers optional "Deep Dive with AI" features powered by Google Gemini.\n\n' +
       '• Use of API Key: Users provide their own Gemini API key. This key is stored securely in your device\'s local storage and is used only to authenticate requests to Google.\n' +
-      '• Data Transmission: When you request an AI explanation, only the question text and answer options are sent to Google\'s servers. No personal information or device identifiers are sent with these requests.',
+      '• Data Transmission: When you request an AI explanation, only the question text and answer options are sent to Google\'s servers. No personal information or device identifiers are sent with these requests.\n' +
+      '• Data Processing: AI-generated content is provided for educational purposes and should be verified against official AWS documentation.',
   },
   {
     title: '4. Push Notifications',
@@ -79,9 +80,11 @@ const SECTIONS: Section[] = [
       'This app does not knowingly collect any information from children under the age of 13. Because all data is stored locally, there is no risk of data collection from any user.',
   },
   {
-    title: '9. Data Security',
+    title: '9. Data Security & Deletion',
     body:
-      'All data remains exclusively on your local device. You can clear your data at any time using the Reset buttons in the Settings screen or by uninstalling the app.',
+      'All data remains exclusively on your local device. You have full control over your data:\n\n' +
+      '• You can reset specific data (Mastered Questions, Exam History, Spaced Repetition) in the Settings tab.\n' +
+      '• You can delete all application data at any time by uninstalling the app from your device.',
   },
   {
     title: '10. Contact Us',
@@ -94,7 +97,7 @@ export default function PrivacyPolicyScreen({ navigation }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity

@@ -43,7 +43,7 @@ const SHARE_MESSAGE = 'Preparing for the AWS AI Practitioner (AIF-C01) exam? Che
 const AI_STUDIO_URL = 'https://aistudio.google.com/';
 
 export default function SettingsScreen({ navigation }: Props) {
-  const { colors, isDark, themeMode, setThemeMode } = useTheme();
+  const { colors, themeMode, setThemeMode } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const scrollRef = useRef<ScrollView>(null);

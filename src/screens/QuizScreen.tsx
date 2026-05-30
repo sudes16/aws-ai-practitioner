@@ -408,10 +408,12 @@ export default function QuizScreen({ navigation, route }: Props) {
       return true;
     });
     return () => handler.remove();
-    // intentional: setShowExamReview and setShowEndModal are stable React dispatch functions
-    // and do not need to be listed as dependencies.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isExam]);
+
+  // Reset scroll to top when question changes
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [viewPos]);
 
   // ── Helpers ──────────────────────────────────────────────────────────────
   const getOptionState = (letter: string): OptionState => {
@@ -757,7 +759,10 @@ export default function QuizScreen({ navigation, route }: Props) {
         showsVerticalScrollIndicator={false}
       >
         {/* Question Card */}
-        <View style={styles.questionCard}>
+        <View style={[
+          styles.questionCard,
+          showFeedback && { borderLeftColor: (feedbackIsCorrect === true) ? colors.correct : (feedbackIsCorrect === false || timedOut) ? colors.wrong : colors.awsOrange }
+        ]}>
           {displayQuestion.is_hotspot && (
             <View style={[styles.typeBadge, styles.hotspotBadge]}>
               <Text style={styles.typeBadgeText}>⚡ MATCHING / ORDERING</Text>
@@ -828,54 +833,17 @@ export default function QuizScreen({ navigation, route }: Props) {
           )}
         </View>
 
-        {/* ── Feedback Box ── */}
-        {showFeedback && (
-          <View
-            style={[
-              styles.feedbackBox,
-              feedbackIsCorrect === true
-                ? styles.feedbackCorrect
-                : (feedbackIsCorrect === false || timedOut)
-                ? styles.feedbackWrong
-                : styles.feedbackNeutral,
-            ]}
-          >
-            {timedOut ? (
-              <Text style={[styles.feedbackTitle, { color: colors.wrong }]}>
-                ⏰ Time's Up!
-              </Text>
-            ) : feedbackIsCorrect === true ? (
-              <Text style={[styles.feedbackTitle, { color: colors.correct }]}>
-                ✓ Correct!
-              </Text>
-            ) : feedbackIsCorrect === false ? (
-              <Text style={[styles.feedbackTitle, { color: colors.wrong }]}>
-                ✗ Wrong
-              </Text>
-            ) : (
-              <Text style={[styles.feedbackTitle, { color: colors.textSecondary }]}>
-                📋 Hotspot question
-              </Text>
-            )}
-
-            {(feedbackIsCorrect === false || timedOut) && (
-                <Text style={styles.feedbackSub}>
-                  Correct answer:{' '}
-                  <Text style={styles.feedbackAnswer}>
-                    {correctLetters.join(', ')}
-                  </Text>
-                </Text>
-            )}
-          </View>
-        )}
-
-        {/* ── Explanation Button (study mode only) ── */}
-        {showFeedback && config.studyMode && displayQuestion.explanation && (
+        {/* ── Minimalist Study Feedback ── */}
+        {showFeedback && config.studyMode && (
           <TouchableOpacity
-            style={styles.explBtn}
+            style={{ marginTop: 12, paddingHorizontal: 4 }}
             onPress={() => setShowExplanation(true)}
+            activeOpacity={0.7}
           >
-            <Text style={styles.explBtnText}>📖 View Explanation</Text>
+            <Text style={{ fontSize: 13, color: (feedbackIsCorrect === true) ? colors.correct : colors.wrong }}>
+              {timedOut ? '⏰ Time\'s Up! ' : (feedbackIsCorrect === true) ? '✓ Correct! ' : '✗ Incorrect. '}
+              <Text style={{ fontWeight: '700', textDecorationLine: 'underline' }}>Review Reasoning →</Text>
+            </Text>
           </TouchableOpacity>
         )}
 
@@ -1784,6 +1752,13 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   feedbackAnswer: {
     fontWeight: '700',
     color: colors.correct,
+  },
+  feedbackTapHint: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    marginTop: 8,
+    textAlign: 'right',
+    opacity: 0.7,
   },
 
   explBtn: {

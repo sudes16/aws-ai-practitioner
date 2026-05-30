@@ -32,15 +32,27 @@ const SECTIONS: Section[] = [
     icon: '📱',
     title: 'Navigation & Swiping',
     body:
-      'Use the bottom tab bar to switch between Practice, Insights, History, and Settings.\n\n' +
-      'On the Home screen, you can swipe left or right to toggle between "Practice Mode" (custom drills) and "Exam Simulation" (full 65-question tests).',
+      'Use the bottom tab bar to switch between Home, Insights, History, and Settings.\n\n' +
+      'The app features a fluid horizontal paging system:\n' +
+      '• Home: Swipe between "Practice" and "Exam Simulation".\n' +
+      '• Insights & History: Swipe between "All", "Practice", and "Exam" views.\n' +
+      '• Review: Swipe between "Correct", "Wrong", and "Flagged" questions.\n\n' +
+      'Navigating between tabs automatically resets the view to the top for a fresh start.',
   },
   {
     icon: '✨',
     title: 'AI Insights (Gemini)',
     body:
       'Unlock deep-dive explanations using Google Gemini AI. During any quiz, tap "View Explanation" and then "Deep Dive with AI" for a plain-English breakdown of the AWS concept.\n\n' +
-      'To enable this, obtain a free API key from Google AI Studio and paste it into the "AI Insights" section in the Settings tab.',
+      'To enable this, obtain a free API key from Google AI Studio and paste it into the "AI Insights" section in the Settings tab. Your key is stored only on your device.',
+  },
+  {
+    icon: '⏱️',
+    title: 'Timed Mode & Test Pressure',
+    body:
+      'Practice with a ticking clock to simulate real exam pressure. Minimum time allowed is 30 seconds per question.\n\n' +
+      '• Study Mode: When time runs out, the app locks the question and waits for you to review the explanation.\n' +
+      '• Test Mode: When time runs out, the app shows a "Time\'s Up!" message and automatically jumps to the next question.',
   },
   {
     icon: '📝',
@@ -50,8 +62,7 @@ const SECTIONS: Section[] = [
       '• Random: Shuffled order.\n' +
       '• Sequential: Numerical order.\n' +
       '• Weak Mode: Only shows questions you haven\'t mastered.\n' +
-      '• Smart Study: Spaced repetition algorithm for maximum retention.\n\n' +
-      'Haptic Feedback: Real devices will vibrate subtly to signal correct or incorrect answer submissions.',
+      '• Smart Study: Spaced repetition algorithm for maximum retention.',
   },
   {
     icon: '🎓',
@@ -66,10 +77,18 @@ const SECTIONS: Section[] = [
       'In Test Mode, you submit answers manually. In Study Mode, correct answers and detailed explanations are revealed automatically after every question for faster learning.',
   },
   {
+    icon: '📊',
+    title: 'Advanced Progress Charts',
+    body:
+      'Visit the Insights tab to see your learning curve on an animated line chart. Track your Score Distribution, Study Streaks, and Question Coverage (unseen vs seen) to ensure you are ready for exam day.\n\n' +
+      'Pro Tip: After any session, use the "Retry Wrong" button on the Results screen to immediately drill into the questions you missed.',
+  },
+  {
     icon: '⭐',
     title: 'Mastered Questions',
     body:
-      'Tap "Mark as Mastered" after a correct answer to remove it from your Weak Mode pool. Track your total confidence level via the Mastery Progress bar in Insights.',
+      'Mastered questions are removed from your Weak Mode pool. To keep your prep honest, if you get a mastered question wrong in a future session, the app will automatically un-master it for you.\n\n' +
+      'You can track your mastery progress in Insights and reset your progress at any time in the Settings tab.',
   },
   {
     icon: '🚩',
@@ -80,22 +99,16 @@ const SECTIONS: Section[] = [
       '• Reports (\u26a0): Submit typos or errors for local tracking.',
   },
   {
-    icon: '📤',
-    title: 'Share with Friends',
-    body:
-      'Use the Share icon in the quiz toolbar to send a question (without the answer) to study partners or colleagues. Perfect for group practice!',
-  },
-  {
     icon: '🔔',
     title: 'Study Reminders',
     body:
       'Schedule custom push notifications in Settings to stay consistent with your AWS preparation.',
   },
   {
-    icon: '\ud83d\udcca',
-    title: 'Insights & History',
+    icon: '🔍',
+    title: 'Clean Data Layout',
     body:
-      'Visit the Insights tab to see your average scores, pass rates, and domain performance. Use the History tab to review every past session and re-attempt specific questions.',
+      'We use professional Pipe (|) separators throughout the app to group metadata clearly, ensuring easy readability on any screen size or theme.',
   },
 ];
 
@@ -103,7 +116,7 @@ export default function HelpScreen({ navigation }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Text style={styles.backBtnText}>←</Text>

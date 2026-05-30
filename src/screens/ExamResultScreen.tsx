@@ -13,7 +13,7 @@ import { RootStackParamList, DOMAIN_LABELS, PASS_THRESHOLD_PCT } from '../consta
 import { getDomainForIndex, EXAM_DOMAIN_COUNTS, EXAM_DOMAIN_PCT, EXAM_TOTAL_QS } from '../utils/quizEngine';
 import { cssVal } from '../utils/styleUtils';
 import { getExamResult, clearExamResult } from '../utils/examResultStore';
-import { addScoreSession, saveSessionRecord } from '../utils/storage';
+import { addScoreSession, saveSessionRecord, addMasteredQuestions, removeMasteredQuestions } from '../utils/storage';
 import { useTheme } from '../contexts/ThemeContext';
 import { ColorScheme } from '../constants/colors';
 
@@ -32,6 +32,12 @@ export default function ExamResultScreen({ navigation }: Props) {
   const passed = totalCorrect / EXAM_TOTAL_QS >= PASS_THRESHOLD_PCT / 100;
 
   useEffect(() => {
+    const correctNums = history.filter(h => h.correct === true).map(h => h.questionNumber);
+    const wrongNums = history.filter(h => h.correct === false).map(h => h.questionNumber);
+
+    if (correctNums.length > 0) addMasteredQuestions(correctNums);
+    if (wrongNums.length > 0) removeMasteredQuestions(wrongNums);
+
     const pct = Math.round((totalCorrect / EXAM_TOTAL_QS) * 100);
     const answeredCount = history.filter(h => h.correct !== null).length;
     saveSessionRecord({
@@ -122,7 +128,7 @@ export default function ExamResultScreen({ navigation }: Props) {
         {/* ── History hint ── */}
         <Text style={styles.historyHint}>📋 Your results and answers are saved in History for later review</Text>
 
-        {/* ── Time row ── */
+        {/* ── Time row ── */}
         <View style={styles.timeRow}>
           <Text style={styles.timeLabel}>⏱ Time used</Text>
           <Text style={styles.timeValue}>
