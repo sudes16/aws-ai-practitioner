@@ -1,9 +1,13 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
+  FlatList,
+  useWindowDimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -11,6 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../constants/types';
 import { useTheme } from '../contexts/ThemeContext';
 import { ColorScheme } from '../constants/colors';
+import { getTotalCount } from '../utils/quizEngine';
 
 export const ONBOARDING_KEY = 'onboarding_complete';
 
@@ -26,35 +31,44 @@ interface Slide {
 const SLIDES: Slide[] = [
   {
     key: 's1',
-    icon: '\uD83C\uDF93',
+    icon: '🎓',
     title: 'Welcome to AWS Quiz',
-    body: 'Your AWS AI Practitioner (AIF-C01) study companion.\n\n200+ exam-style questions with full explanations to help you pass first time.',
+    body: `${getTotalCount()}+ exam-style questions with detailed reasoning and AI deep-dives to help you master the AIF-C01 concepts.`,
   },
   {
     key: 's2',
-    icon: '\uD83D\uDCCB',
-    title: 'Two Study Modes',
-    body: 'Practice Mode \u2014 choose your question range, domain, and pace.\n\nExam Simulation \u2014 timed 65-question mock exam weighted by domain, just like the real thing.',
+    icon: '📱',
+    title: 'Fluid Paging & Navigation',
+    body: 'Seamlessly swipe between Practice, Insights, and History. Tap any section to instantly return to the top for a fresh start.',
   },
   {
     key: 's3',
-    icon: '\uD83D\uDCD6',
-    title: 'Review & Track Progress',
-    body: 'After every session, review every answer with detailed explanations.\n\nRevisit past sessions anytime from Settings \u2192 Progress History.',
+    icon: '⏱️',
+    title: 'Study vs Test Mode',
+    body: 'Practice at your own pace with Guided Learning or simulate exam pressure with Auto-Advance timed sessions.',
   },
   {
     key: 's4',
-    icon: '\uD83E\uDDE0',
-    title: 'Smart Study Tools',
-    body: 'Flag questions, add notes, and use Smart Study to focus on your weakest areas.\n\nTap the \u2753 Help button anytime for a full feature guide.',
+    icon: '🧠',
+    title: 'Smart Mastery Tools',
+    body: 'Flag difficult items, add private notes, and use Spaced Repetition to focus purely on your weakest areas.',
+  },
+  {
+    key: 's5',
+    icon: '🎯',
+    title: 'Certification Readiness',
+    body: 'Set your exam date and track your progress with our live countdown. Full-length, domain-weighted simulations ensure you land on exam day with 100% confidence.',
   },
 ];
 
 export default function OnboardingScreen({ navigation, route }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { width: screenWidth } = useWindowDimensions();
   const [activeIndex, setActiveIndex] = useState(0);
   const isReplay = route.params?.replay === true;
+
+  const flatListRef = useRef<FlatList>(null);
 
   const finish = async () => {
     if (!isReplay) {
@@ -67,42 +81,77 @@ export default function OnboardingScreen({ navigation, route }: Props) {
     }
   };
 
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const x = event.nativeEvent.contentOffset.x;
+    const index = Math.round(x / screenWidth);
+    if (index !== activeIndex) {
+      setActiveIndex(index);
+    }
+  };
+
   const next = () => {
     if (activeIndex < SLIDES.length - 1) {
-      setActiveIndex(activeIndex + 1);
+      flatListRef.current?.scrollToIndex({ index: activeIndex + 1, animated: true });
     } else {
       finish();
     }
   };
 
   const isLast = activeIndex === SLIDES.length - 1;
-  const slide = SLIDES[activeIndex];
+
+  const renderItem = ({ item }: { item: Slide }) => (
+    <View style={[styles.slide, { width: screenWidth }]}>
+      <Text style={styles.icon}>{item.icon}</Text>
+      <Text style={styles.title}>{item.title}</Text>
+      <Text style={styles.body}>{item.body}</Text>
+    </View>
+  );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Skip / Close */}
-      <TouchableOpacity style={styles.skipBtn} onPress={finish} activeOpacity={0.7}>
-        <Text style={styles.skipText}>{isReplay ? 'Close' : 'Skip'}</Text>
-      </TouchableOpacity>
+      <View style={styles.header}>
+        {activeIndex > 0 ? (
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => flatListRef.current?.scrollToIndex({ index: activeIndex - 1, animated: true })}
+          >
+            <Text style={styles.backText}>← Back</Text>
+          </TouchableOpacity>
+        ) : <View />}
 
-      {/* Slide content */}
-      <View style={styles.slide}>
-        <Text style={styles.icon}>{slide.icon}</Text>
-        <Text style={styles.title}>{slide.title}</Text>
-        <Text style={styles.body}>{slide.body}</Text>
+        <TouchableOpacity style={styles.skipBtn} onPress={finish} activeOpacity={0.7}>
+          <Text style={styles.skipText}>{isReplay ? 'Close' : 'Skip'}</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Dot indicators */}
-      <View style={styles.dots}>
-        {SLIDES.map((_, i) => (
-          <View key={i} style={[styles.dot, i === activeIndex && styles.dotActive]} />
-        ))}
-      </View>
+      {/* Swipeable slides */}
+      <FlatList
+        ref={flatListRef}
+        data={SLIDES}
+        renderItem={renderItem}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={handleScroll}
+        keyExtractor={item => item.key}
+        bounces={false}
+      />
 
-      {/* Next / Get Started */}
-      <TouchableOpacity style={styles.nextBtn} onPress={next} activeOpacity={0.8}>
-        <Text style={styles.nextText}>{isLast ? 'Get Started' : 'Next \u2192'}</Text>
-      </TouchableOpacity>
+      {/* Footer area */}
+      <View style={styles.footer}>
+        {/* Dot indicators */}
+        <View style={styles.dots}>
+          {SLIDES.map((_, i) => (
+            <View key={i} style={[styles.dot, i === activeIndex && styles.dotActive]} />
+          ))}
+        </View>
+
+        {/* Next / Get Started */}
+        <TouchableOpacity style={styles.nextBtn} onPress={next} activeOpacity={0.8}>
+          <Text style={styles.nextText}>{isLast ? (isReplay ? 'Done' : 'Get Started') : 'Next →'}</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -113,11 +162,23 @@ function makeStyles(colors: ColorScheme) {
       flex: 1,
       backgroundColor: colors.background,
     },
-    skipBtn: {
-      alignSelf: 'flex-end',
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
       paddingHorizontal: 20,
       paddingTop: 12,
-      paddingBottom: 4,
+    },
+    backBtn: {
+      paddingVertical: 4,
+    },
+    backText: {
+      color: colors.textSecondary,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    skipBtn: {
+      paddingVertical: 4,
     },
     skipText: {
       color: colors.textMuted,
@@ -127,19 +188,19 @@ function makeStyles(colors: ColorScheme) {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingHorizontal: 36,
-      paddingBottom: 40,
+      paddingHorizontal: 40,
     },
     icon: {
-      fontSize: 72,
-      marginBottom: 28,
+      fontSize: 84,
+      marginBottom: 32,
     },
     title: {
       fontSize: 26,
-      fontWeight: '700',
+      fontWeight: '900',
       color: colors.textPrimary,
       textAlign: 'center',
       marginBottom: 20,
+      letterSpacing: 0.5,
     },
     body: {
       fontSize: 16,
@@ -147,11 +208,14 @@ function makeStyles(colors: ColorScheme) {
       textAlign: 'center',
       lineHeight: 26,
     },
+    footer: {
+      paddingBottom: 20,
+    },
     dots: {
       flexDirection: 'row',
       justifyContent: 'center',
       alignItems: 'center',
-      marginBottom: 24,
+      marginBottom: 32,
     },
     dot: {
       width: 8,
@@ -167,16 +231,16 @@ function makeStyles(colors: ColorScheme) {
     },
     nextBtn: {
       marginHorizontal: 24,
-      marginBottom: 16,
       backgroundColor: colors.awsOrange,
       borderRadius: 14,
-      paddingVertical: 16,
+      paddingVertical: 17,
       alignItems: 'center',
     },
     nextText: {
       color: '#fff',
       fontSize: 17,
-      fontWeight: '700',
+      fontWeight: '800',
     },
   });
 }
+
