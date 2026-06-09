@@ -1,6 +1,7 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
+import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import AppNavigator from './src/navigation/AppNavigator';
@@ -8,30 +9,41 @@ import ErrorBoundary from './src/components/ErrorBoundary';
 import { ThemeProvider } from './src/contexts/ThemeContext';
 import { loadCachedOtaQuestions, fetchRemoteQuestions } from './src/utils/quizEngine';
 
-// Keep the splash screen visible while we load cached questions
+// Prevent the splash screen from hiding automatically
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function App() {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    loadCachedOtaQuestions()
-      .catch(() => {})
-      .finally(() => {
-        setIsReady(true);
-        SplashScreen.hideAsync().catch(() => {});
-        // Fetch fresh questions in the background after the app is visible
+    async function loadData() {
+      try {
+        // Load local questions
+        await loadCachedOtaQuestions();
+        // Background fetch for fresh ones
         fetchRemoteQuestions().catch(() => {});
-      });
+      } catch (e) {
+        console.warn('Load Error:', e);
+      } finally {
+        // CRUCIAL: Set ready and hide splash IMMEDIATELY
+        setIsReady(true);
+        await SplashScreen.hideAsync().catch(() => {});
+      }
+    }
+
+    loadData();
   }, []);
 
-  if (!isReady) return null;
+  // Show a solid color matching your branding while the engine boots
+  if (!isReady) {
+    return <View style={{ flex: 1, backgroundColor: '#232F3E' }} />;
+  }
 
   return (
     <ErrorBoundary>
       <ThemeProvider>
         <SafeAreaProvider>
-          <StatusBar style="auto" />
+          <StatusBar style="light" />
           <AppNavigator />
         </SafeAreaProvider>
       </ThemeProvider>
