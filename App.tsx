@@ -1,12 +1,12 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View } from 'react-native';
+import { View, Text, Image, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import AppNavigator from './src/navigation/AppNavigator';
 import ErrorBoundary from './src/components/ErrorBoundary';
-import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
+import { ThemeProvider } from './src/contexts/ThemeContext';
 import { loadCachedOtaQuestions, fetchRemoteQuestions } from './src/utils/quizEngine';
 
 // Prevent the splash screen from hiding automatically
@@ -25,37 +25,92 @@ export default function App() {
       } catch (e) {
         console.warn('Load Error:', e);
       } finally {
-        // CRUCIAL: Set ready and hide splash IMMEDIATELY
-        setIsReady(true);
-        await SplashScreen.hideAsync().catch(() => {});
+        // Wait a tiny bit extra for smooth transition
+        setTimeout(() => {
+          setIsReady(true);
+          SplashScreen.hideAsync().catch(() => {});
+        }, 500);
       }
     }
 
     loadData();
   }, []);
 
-  // Brand-matched splash placeholder (renders before ThemeProvider — fixed awsDark navy in both light/dark modes).
+  // Stage 2: High-Contrast Loading UI (Replaces the blank blue screen)
   if (!isReady) {
-    return <View style={{ flex: 1, backgroundColor: '#1A2B4C' }} />;
+    return (
+      <View style={styles.loadingContainer}>
+        <StatusBar style="light" />
+        <View style={styles.content}>
+          <Image
+            source={require('./assets/icon.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <Text style={styles.title}>AWS AI Practitioner</Text>
+          <Text style={styles.subtitle}>AIF-C01 Quiz</Text>
+
+          <View style={styles.footer}>
+             <ActivityIndicator size="small" color="#FF9900" style={{ marginBottom: 20 }} />
+             <Text style={styles.tagline}>STUDY SMART. PASS FAST.</Text>
+          </View>
+        </View>
+      </View>
+    );
   }
 
   return (
     <ErrorBoundary>
       <ThemeProvider>
         <SafeAreaProvider>
-          <ThemedAppShell />
+          <StatusBar style="light" />
+          <AppNavigator />
         </SafeAreaProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );
 }
 
-function ThemedAppShell() {
-  const { isDark } = useTheme();
-  return (
-    <>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
-      <AppNavigator />
-    </>
-  );
-}
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#1A2B4C', // Matches icon background exactly
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  content: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  logo: {
+    width: 140,
+    height: 140,
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  subtitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FF9900',
+    marginTop: 4,
+    textTransform: 'uppercase',
+  },
+  footer: {
+    position: 'absolute',
+    bottom: -150, // Positions it below the main text group
+    alignItems: 'center',
+  },
+  tagline: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF', // Changed from grey to Pure White
+    letterSpacing: 2,
+    opacity: 0.9,
+  },
+});
