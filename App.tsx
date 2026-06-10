@@ -50,8 +50,8 @@ export default function App() {
           <Text style={styles.title}>AWS AI Practitioner</Text>
           <Text style={styles.subtitle}>AIF-C01 Quiz</Text>
 
-          <View style={styles.footer}>
-             <ActivityIndicator size="small" color="#FF9900" style={{ marginBottom: 20 }} />
+          <View style={styles.loaderArea}>
+             <ActivityIndicator size="small" color="#FF9900" style={{ marginVertical: 24 }} />
              <Text style={styles.tagline}>STUDY SMART. PASS FAST.</Text>
           </View>
         </View>
@@ -74,7 +74,7 @@ export default function App() {
 const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#1A2B4C', // Matches icon background exactly
+    backgroundColor: '#1A2B4C', // Sync: All backgrounds now #1A2B4C
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -82,6 +82,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
+    paddingBottom: 40, // Keeps everything slightly above dead-center
   },
   logo: {
     width: 140,
@@ -101,16 +102,15 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textTransform: 'uppercase',
   },
-  footer: {
-    position: 'absolute',
-    bottom: -150, // Positions it below the main text group
+  loaderArea: {
+    marginTop: 40,
     alignItems: 'center',
   },
   tagline: {
     fontSize: 13,
     fontWeight: '800',
-    color: '#FFFFFF', // Changed from grey to Pure White
-    letterSpacing: 2,
-    opacity: 0.9,
+    color: '#FFFFFF',
+    letterSpacing: 2.5,
+    opacity: 0.95,
   },
 });
