@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -73,6 +73,12 @@ export default function SessionHistoryScreen({ navigation }: Props) {
       });
     }
   }, [activeTab]);
+
+  const getItemLayout = (_: any, index: number) => ({
+    length: 110, // Matching the style width
+    offset: (110 + 8) * index, // length + gap
+    index,
+  });
 
   // Refs for internal scroll views to reset position
   const scrollRefs = useRef<Record<string, ScrollView | null>>({});
@@ -251,6 +257,8 @@ export default function SessionHistoryScreen({ navigation }: Props) {
           showsHorizontalScrollIndicator={false}
           keyExtractor={t => t.key}
           contentContainerStyle={styles.tabListContent}
+          getItemLayout={getItemLayout}
+          initialNumToRender={3}
           renderItem={({ item: tab }) => {
             const count =
               tab.key === 'all'  ? scoreHistory.filter(s => resolveAnswered(s) > 0).length

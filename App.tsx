@@ -36,7 +36,7 @@ export default function App() {
 
   // Show a solid color matching your branding while the engine boots
   if (!isReady) {
-    return <View style={{ flex: 1, backgroundColor: '#232F3E' }} />;
+    return <View style={{ flex: 1, backgroundColor: '#1A2B4C' }} />;
   }
 
   return (

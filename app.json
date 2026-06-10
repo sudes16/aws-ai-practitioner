@@ -9,7 +9,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#1A2332"
+      "backgroundColor": "#1A2B4C"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -39,7 +39,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#232F3E"
+        "backgroundColor": "#1A2B4C"
       },
       "package": "com.awsquiz.aifpractitioner",
       "versionCode": 4,

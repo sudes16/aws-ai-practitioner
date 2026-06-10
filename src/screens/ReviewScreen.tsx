@@ -57,10 +57,16 @@ export default function ReviewScreen({ navigation, route }: Props) {
       filterListRef.current?.scrollToIndex({
         index: idx,
         animated: true,
-        viewPosition: 0.5, // Centers the item
+        viewPosition: 0.5,
       });
     }
   }, [filter]);
+
+  const getItemLayout = (_: any, index: number) => ({
+    length: 100, // Matching the style width
+    offset: (100 + 8) * index, // length + gap
+    index,
+  });
 
   useEffect(() => {
     // If there's an initial filter, scroll to it on mount
@@ -270,6 +276,8 @@ export default function ReviewScreen({ navigation, route }: Props) {
           showsHorizontalScrollIndicator={false}
           keyExtractor={f => f.key}
           contentContainerStyle={styles.filterList}
+          getItemLayout={getItemLayout}
+          initialNumToRender={5}
           renderItem={({ item: f }) => (
             <TouchableOpacity
               style={[
@@ -401,10 +409,12 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     gap: 8,
   },
   filterTab: {
-    paddingHorizontal: 14,
+    width: 100, // Fixed width for reliable centering
     paddingVertical: 7,
     borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   filterTabActive: {
     backgroundColor: colors.awsOrange,

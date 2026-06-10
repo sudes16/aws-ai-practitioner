@@ -3,7 +3,7 @@ export type ColorScheme = typeof LightColors;
 export const LightColors = {
   // AWS brand
   awsOrange: '#FF9900',
-  awsDark: '#232F3E',
+  awsDark: '#1A2B4C',
 
   // Layout
   background: '#F0F2F5',
@@ -66,7 +66,7 @@ export const LightColors = {
 export const DarkColors: ColorScheme = {
   // AWS brand (unchanged)
   awsOrange: '#FF9900',
-  awsDark: '#232F3E',
+  awsDark: '#1A2B4C',
 
   // Layout
   background: '#0F1117',

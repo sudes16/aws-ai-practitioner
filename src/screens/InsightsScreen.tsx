@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -79,6 +79,12 @@ export default function InsightsScreen({ navigation }: Props) {
       });
     }
   }, [activeTab]);
+
+  const getItemLayout = (_: any, index: number) => ({
+    length: 110, // Matching the style width
+    offset: (110 + 8) * index, // length + gap
+    index,
+  });
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -377,6 +383,8 @@ export default function InsightsScreen({ navigation }: Props) {
           showsHorizontalScrollIndicator={false}
           keyExtractor={t => t.key}
           contentContainerStyle={styles.tabListContent}
+          getItemLayout={getItemLayout}
+          initialNumToRender={3}
           renderItem={({ item: tab }) => (
             <TouchableOpacity
               style={[styles.tab, activeTab === tab.key && styles.tabActive]}
