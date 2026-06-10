@@ -112,6 +112,23 @@ export default function HomeScreen({ navigation }: Props) {
     setCount(String(calcPoolSize(next, domain, fromQ, toQ)));
   }, [calcPoolSize, questionType, domain, fromQ, toQ]);
 
+  // Quick-preset click: sync From=1, To=n, count clamped to pool within the new range.
+  const handlePresetCount = useCallback((n: number) => {
+    const newTo = Math.min(n, total);
+    setFromQ('1');
+    setToQ(String(newTo));
+    const newPool = calcPoolSize(questionType, domain, '1', String(newTo));
+    setCount(String(Math.min(n, newPool)));
+  }, [calcPoolSize, questionType, domain, total]);
+
+  // "All" preset: full range, count = current filtered pool.
+  const handlePresetAll = useCallback(() => {
+    setFromQ('1');
+    setToQ(String(total));
+    const newPool = calcPoolSize(questionType, domain, '1', String(total));
+    setCount(String(newPool));
+  }, [calcPoolSize, questionType, domain, total]);
+
   const filteredDomainCounts = useMemo(() => {
     const counts: Record<number, number> = {};
     allQuestions.forEach((q, i) => {
@@ -497,14 +514,14 @@ export default function HomeScreen({ navigation }: Props) {
                 <TouchableOpacity
                   key={n}
                   style={styles.presetBtn}
-                  onPress={() => setCount(String(n))}
+                  onPress={() => handlePresetCount(n)}
                 >
                   <Text style={styles.presetBtnText}>{n} Qs</Text>
                 </TouchableOpacity>
               ))}
               <TouchableOpacity
                 style={styles.presetBtn}
-                onPress={() => setCount(String(poolSize))}
+                onPress={handlePresetAll}
               >
                 <Text style={styles.presetBtnText}>All ({poolSize})</Text>
               </TouchableOpacity>
@@ -669,7 +686,15 @@ export default function HomeScreen({ navigation }: Props) {
           onPress={appMode === 'exam' ? handleExamStart : handleStart}
           disabled={loading || (appMode === 'practice' && poolSize === 0)}
         >
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.startBtnText}>{appMode === 'exam' ? '🎓 Take Mock Exam →' : '🎯 Start Practice →'}</Text>}
+          {loading
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={styles.startBtnText}>{
+                appMode === 'exam'
+                  ? '🎓 Take Mock Exam →'
+                  : poolSize === 0
+                    ? '🚫 No questions in this filter'
+                    : '🎯 Start Practice →'
+              }</Text>}
         </TouchableOpacity>
       </View>
 
