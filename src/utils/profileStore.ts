@@ -6,6 +6,10 @@ export interface UserProfile {
   name: string;
   /** ISO date string: YYYY-MM-DD */
   examDate: string;
+  /** Set after the user confirms they took (and passed) the exam. Cleared when exam date is edited/rescheduled. */
+  examStatus?: 'passed';
+  /** ISO date string: YYYY-MM-DD — the day the user marked the exam as passed. */
+  passedDate?: string;
 }
 
 export async function getProfile(): Promise<UserProfile | null> {
@@ -100,4 +104,16 @@ export async function setPostExamPromptLater(examDate: string): Promise<void> {
     const later = Date.now() + 2 * 24 * 60 * 60 * 1000;
     await AsyncStorage.setItem(POST_EXAM_PREFIX + examDate, String(later));
   } catch {}
+}
+
+function todayISO(): string {
+  const t = new Date();
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+}
+
+/** Persist the "passed" status on the profile and return the updated profile. */
+export async function markExamPassed(profile: UserProfile): Promise<UserProfile> {
+  const updated: UserProfile = { ...profile, examStatus: 'passed', passedDate: todayISO() };
+  await saveProfile(updated);
+  return updated;
 }

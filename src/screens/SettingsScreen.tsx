@@ -290,7 +290,16 @@ export default function SettingsScreen({ navigation }: Props) {
                       minimumFontScale={0.8}
                     >
                       {'Exam: '}{examDateFormatted}
-                      {daysLeft !== null && (
+                      {profile.examStatus === 'passed' ? (
+                        <>
+                          <Text style={{ color: colors.textMuted }}>{'  |  '}</Text>
+                          <Text style={[styles.profileDaysTag, { color: colors.correct }]}>
+                            {profile.passedDate
+                              ? `🏆 Passed ${new Date(profile.passedDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                              : '🏆 Certified'}
+                          </Text>
+                        </>
+                      ) : daysLeft !== null && (
                         <>
                           <Text style={{ color: colors.textMuted }}>{'  |  '}</Text>
                           <Text style={[

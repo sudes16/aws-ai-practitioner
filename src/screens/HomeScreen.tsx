@@ -20,7 +20,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList, DomainFilter, DOMAIN_LABELS, QuizMode } from '../constants/types';
 import { getTotalCount, buildIndices, getDomainCounts, getAllQuestions, buildExamQuestions, getDomainForIndex, EXAM_DOMAIN_COUNTS, EXAM_DOMAIN_PCT, EXAM_TOTAL_QS } from '../utils/quizEngine';
 import { getMasteredQuestions } from '../utils/storage';
-import { getProfile, saveProfile, getDaysLeft, UserProfile, validateProfileInputs, getPostExamPromptState, setPostExamPromptDismissed, setPostExamPromptLater } from '../utils/profileStore';
+import { getProfile, saveProfile, getDaysLeft, UserProfile, validateProfileInputs, getPostExamPromptState, setPostExamPromptDismissed, setPostExamPromptLater, markExamPassed } from '../utils/profileStore';
 import { scheduleExamCountdownNotifications } from '../utils/notificationService';
 import { useTheme } from '../contexts/ThemeContext';
 import { ColorScheme } from '../constants/colors';
@@ -157,7 +157,7 @@ export default function HomeScreen({ navigation }: Props) {
       getProfile().then(async p => {
         if (p) {
           setProfile(p);
-          if (getDaysLeft(p.examDate) < 0) {
+          if (p.examStatus !== 'passed' && getDaysLeft(p.examDate) < 0) {
             const state = await getPostExamPromptState(p.examDate);
             if (state === null || (typeof state === 'number' && Date.now() >= state)) {
               setShowPostExamModal(true);
@@ -172,6 +172,8 @@ export default function HomeScreen({ navigation }: Props) {
 
   const handlePostExamPassed = async () => {
     if (!profile) return;
+    const updated = await markExamPassed(profile);
+    setProfile(updated);
     await setPostExamPromptDismissed(profile.examDate);
     setShowPostExamModal(false);
   };
@@ -329,7 +331,7 @@ export default function HomeScreen({ navigation }: Props) {
       return (
         <ScrollView
           ref={r => { scrollRefs.current[tabKey] = r; }}
-          style={{ width: screenWidth }}
+          style={{ width: screenWidth, backgroundColor: colors.background }}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
@@ -515,7 +517,7 @@ export default function HomeScreen({ navigation }: Props) {
       return (
         <ScrollView
           ref={r => { scrollRefs.current[tabKey] = r; }}
-          style={{ width: screenWidth }}
+          style={{ width: screenWidth, backgroundColor: colors.background }}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
@@ -588,24 +590,47 @@ export default function HomeScreen({ navigation }: Props) {
         </View>
       </View>
 
-      {profile && (
-        <TouchableOpacity
-          style={styles.countdownBanner}
-          activeOpacity={0.8}
-          onPress={() => {
-            setObName(profile.name);
-            const [y, m, d] = profile.examDate.split('-');
-            setObYear(y); setObMonth(m); setObDay(d);
-            setObError('');
-            setShowOnboarding(true);
-          }}
-        >
-          <Text style={styles.countdownName}>{new Date().getHours() < 12 ? '🌅 Good morning' : '☀️ Good afternoon'}{', '}{profile.name}{'!'}</Text>
-          <Text style={[styles.countdownDays, { color: getDaysLeft(profile.examDate) > 7 ? '#16A34A' : colors.awsOrange }]}>
-            📅 {getDaysLeft(profile.examDate)} days to exam
-          </Text>
-        </TouchableOpacity>
-      )}
+      {profile && (() => {
+        const days = getDaysLeft(profile.examDate);
+        const isPassed = profile.examStatus === 'passed';
+        const onBannerPress = () => {
+          if (isPassed) { navigation.navigate('Settings'); return; }
+          if (days < 0) { setShowPostExamModal(true); return; }
+          setObName(profile.name);
+          const [y, m, d] = profile.examDate.split('-');
+          setObYear(y); setObMonth(m); setObDay(d);
+          setObError('');
+          setShowOnboarding(true);
+        };
+        let label: string;
+        let color: string;
+        if (isPassed) {
+          const pretty = profile.passedDate
+            ? new Date(profile.passedDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            : '';
+          label = pretty ? `🏆 AWS Certified — passed ${pretty}` : '🏆 AWS Certified!';
+          color = colors.correct;
+        } else if (days > 0) {
+          label = `📅 ${days} days to exam`;
+          color = days > 7 ? colors.correct : colors.awsOrange;
+        } else if (days === 0) {
+          label = '🎯 Exam day — good luck!';
+          color = colors.awsOrange;
+        } else {
+          label = '📝 Awaiting result — tap to update';
+          color = colors.awsOrange;
+        }
+        return (
+          <TouchableOpacity
+            style={styles.countdownBanner}
+            activeOpacity={0.8}
+            onPress={onBannerPress}
+          >
+            <Text style={styles.countdownName}>{new Date().getHours() < 12 ? '🌅 Good morning' : '☀️ Good afternoon'}{', '}{profile.name}{'!'}</Text>
+            <Text style={[styles.countdownDays, { color }]}>{label}</Text>
+          </TouchableOpacity>
+        );
+      })()}
 
       {/* Tabs */}
       <View style={styles.modeTabs}>

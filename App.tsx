@@ -6,7 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import AppNavigator from './src/navigation/AppNavigator';
 import ErrorBoundary from './src/components/ErrorBoundary';
-import { ThemeProvider } from './src/contexts/ThemeContext';
+import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import { loadCachedOtaQuestions, fetchRemoteQuestions } from './src/utils/quizEngine';
 
 // Prevent the splash screen from hiding automatically
@@ -34,7 +34,7 @@ export default function App() {
     loadData();
   }, []);
 
-  // Show a solid color matching your branding while the engine boots
+  // Brand-matched splash placeholder (renders before ThemeProvider — fixed awsDark navy in both light/dark modes).
   if (!isReady) {
     return <View style={{ flex: 1, backgroundColor: '#1A2B4C' }} />;
   }
@@ -43,10 +43,19 @@ export default function App() {
     <ErrorBoundary>
       <ThemeProvider>
         <SafeAreaProvider>
-          <StatusBar style="light" />
-          <AppNavigator />
+          <ThemedAppShell />
         </SafeAreaProvider>
       </ThemeProvider>
     </ErrorBoundary>
+  );
+}
+
+function ThemedAppShell() {
+  const { isDark } = useTheme();
+  return (
+    <>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <AppNavigator />
+    </>
   );
 }

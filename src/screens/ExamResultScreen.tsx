@@ -133,6 +133,7 @@ export default function ExamResultScreen({ navigation }: Props) {
       </View>
 
       <ScrollView
+        style={{ backgroundColor: colors.background }}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >

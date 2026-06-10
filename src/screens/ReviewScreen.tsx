@@ -226,7 +226,7 @@ export default function ReviewScreen({ navigation, route }: Props) {
     });
 
     return (
-      <View style={{ width: screenWidth }}>
+      <View style={{ width: screenWidth, backgroundColor: colors.background }}>
         <FlatList
           ref={r => { listRefs.current[filterKey] = r; }}
           data={filteredData}
@@ -302,7 +302,7 @@ export default function ReviewScreen({ navigation, route }: Props) {
         />
       </View>
 
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
         <FlatList
           ref={flatListRef}
           data={FILTERS.map(f => f.key)}
