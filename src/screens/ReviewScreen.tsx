@@ -44,10 +44,23 @@ export default function ReviewScreen({ navigation, route }: Props) {
   const { notesMap } = useNotes();
 
   const flatListRef = useRef<FlatList>(null);
+  const filterListRef = useRef<FlatList>(null);
   const isInternalScroll = useRef(false);
 
   // Refs for internal lists to reset position
   const listRefs = useRef<Record<string, FlatList | null>>({});
+
+  // Sync header tabs when filter changes (due to swipe or tap)
+  useEffect(() => {
+    const idx = FILTERS.findIndex(f => f.key === filter);
+    if (idx !== -1) {
+      filterListRef.current?.scrollToIndex({
+        index: idx,
+        animated: true,
+        viewPosition: 0.5, // Centers the item
+      });
+    }
+  }, [filter]);
 
   useEffect(() => {
     // If there's an initial filter, scroll to it on mount
@@ -251,6 +264,7 @@ export default function ReviewScreen({ navigation, route }: Props) {
 
       <View style={styles.filterWrap}>
         <FlatList
+          ref={filterListRef}
           data={FILTERS}
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -274,6 +288,9 @@ export default function ReviewScreen({ navigation, route }: Props) {
               </Text>
             </TouchableOpacity>
           )}
+          onScrollToIndexFailed={info => {
+            filterListRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true });
+          }}
         />
       </View>
 

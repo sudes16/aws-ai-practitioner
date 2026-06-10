@@ -64,8 +64,21 @@ export default function InsightsScreen({ navigation }: Props) {
   const totalQCount = getTotalCount();
 
   const flatListRef = useRef<FlatList>(null);
+  const tabListRef = useRef<FlatList>(null);
   const isInternalScroll = useRef(false);
   const scrollRefs = useRef<Record<string, ScrollView | null>>({});
+
+  // Sync header tabs when activeTab changes (due to swipe or tap)
+  useEffect(() => {
+    const idx = TABS.findIndex(t => t.key === activeTab);
+    if (idx !== -1) {
+      tabListRef.current?.scrollToIndex({
+        index: idx,
+        animated: true,
+        viewPosition: 0.5,
+      });
+    }
+  }, [activeTab]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -357,15 +370,27 @@ export default function InsightsScreen({ navigation }: Props) {
       </View>
 
       <View style={styles.tabBar}>
-        {TABS.map(tab => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[styles.tab, activeTab === tab.key && styles.tabActive]}
-            onPress={() => scrollToTab(tab.key)}
-          >
-            <Text style={[styles.tabLabel, activeTab === tab.key && styles.tabLabelActive]}>{tab.label}</Text>
-          </TouchableOpacity>
-        ))}
+        <FlatList
+          ref={tabListRef}
+          data={TABS}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={t => t.key}
+          contentContainerStyle={styles.tabListContent}
+          renderItem={({ item: tab }) => (
+            <TouchableOpacity
+              style={[styles.tab, activeTab === tab.key && styles.tabActive]}
+              onPress={() => scrollToTab(tab.key)}
+            >
+              <Text style={[styles.tabLabel, activeTab === tab.key && styles.tabLabelActive]}>
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          )}
+          onScrollToIndexFailed={info => {
+            tabListRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true });
+          }}
+        />
       </View>
 
       <View style={{ flex: 1 }}>
@@ -445,8 +470,9 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.awsDark },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   headerTitle: { fontSize: 18, fontWeight: '800', color: colors.textLight, textAlign: 'center', flex: 1 },
-  tabBar: { flexDirection: 'row', backgroundColor: colors.awsDark, paddingHorizontal: 16, paddingBottom: 10, gap: 8 },
-  tab: { flex: 1, paddingVertical: 8, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center' },
+  tabBar: { backgroundColor: colors.awsDark, paddingBottom: 10 },
+  tabListContent: { paddingHorizontal: 16, gap: 8 },
+  tab: { width: 110, paddingVertical: 8, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center' },
   tabActive: { backgroundColor: colors.awsOrange },
   tabLabel: { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.6)' },
   tabLabelActive: { color: '#fff' },

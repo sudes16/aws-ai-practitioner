@@ -59,7 +59,20 @@ export default function SessionHistoryScreen({ navigation }: Props) {
   const { notesMap }                       = useNotes();
 
   const flatListRef = useRef<FlatList>(null);
+  const tabListRef = useRef<FlatList>(null);
   const isInternalScroll = useRef(false);
+
+  // Sync header tabs when activeTab changes (due to swipe or tap)
+  useEffect(() => {
+    const idx = TABS.findIndex(t => t.key === activeTab);
+    if (idx !== -1) {
+      tabListRef.current?.scrollToIndex({
+        index: idx,
+        animated: true,
+        viewPosition: 0.5,
+      });
+    }
+  }, [activeTab]);
 
   // Refs for internal scroll views to reset position
   const scrollRefs = useRef<Record<string, ScrollView | null>>({});
@@ -231,29 +244,39 @@ export default function SessionHistoryScreen({ navigation }: Props) {
 
       {/* Tabs */}
       <View style={styles.tabBar}>
-        {TABS.map(tab => {
-          const count =
-            tab.key === 'all'  ? scoreHistory.filter(s => resolveAnswered(s) > 0).length
-            : tab.key === 'exam' ? scoreHistory.filter(s => s.mode === 'exam' && resolveAnswered(s) > 0).length
-            : scoreHistory.filter(s => s.mode !== 'exam' && resolveAnswered(s) > 0).length;
-          return (
-            <TouchableOpacity
-              key={tab.key}
-              style={[styles.tab, activeTab === tab.key && styles.tabActive]}
-              onPress={() => scrollToTab(tab.key)}
-              accessibilityRole="tab"
-            >
-              <Text style={[styles.tabLabel, activeTab === tab.key && styles.tabLabelActive]}>
-                {tab.label}
-              </Text>
-              {count > 0 && (
-                <Text style={[styles.tabCount, activeTab === tab.key && styles.tabCountActive]}>
-                  {count}
+        <FlatList
+          ref={tabListRef}
+          data={TABS}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={t => t.key}
+          contentContainerStyle={styles.tabListContent}
+          renderItem={({ item: tab }) => {
+            const count =
+              tab.key === 'all'  ? scoreHistory.filter(s => resolveAnswered(s) > 0).length
+              : tab.key === 'exam' ? scoreHistory.filter(s => s.mode === 'exam' && resolveAnswered(s) > 0).length
+              : scoreHistory.filter(s => s.mode !== 'exam' && resolveAnswered(s) > 0).length;
+            return (
+              <TouchableOpacity
+                style={[styles.tab, activeTab === tab.key && styles.tabActive]}
+                onPress={() => scrollToTab(tab.key)}
+                accessibilityRole="tab"
+              >
+                <Text style={[styles.tabLabel, activeTab === tab.key && styles.tabLabelActive]}>
+                  {tab.label}
                 </Text>
-              )}
-            </TouchableOpacity>
-          );
-        })}
+                {count > 0 && (
+                  <Text style={[styles.tabCount, activeTab === tab.key && styles.tabCountActive]}>
+                    {count}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            );
+          }}
+          onScrollToIndexFailed={info => {
+            tabListRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true });
+          }}
+        />
       </View>
 
       <View style={{ flex: 1 }}>
@@ -307,14 +330,15 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   },
 
   tabBar: {
-    flexDirection: 'row',
     backgroundColor: colors.awsDark,
-    paddingHorizontal: 16,
     paddingBottom: 10,
+  },
+  tabListContent: {
+    paddingHorizontal: 16,
     gap: 8,
   },
   tab: {
-    flex: 1,
+    width: 110,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
