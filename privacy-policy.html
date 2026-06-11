@@ -201,6 +201,7 @@
       The app uses <strong>device-local notifications</strong> to remind you to study at times you choose. Reminders are scheduled and delivered entirely on your device.
     </p>
     <ul style="margin-top: 0.5rem;">
+      <li>Notifications still appear on your device exactly when you scheduled them — the Android operating system handles delivery locally, even when offline.</li>
       <li>No external push servers (e.g., Firebase Cloud Messaging) are used.</li>
       <li>No device identifier or notification token is collected or transmitted.</li>
       <li>The <code>RECEIVE_BOOT_COMPLETED</code> permission is used solely to re-register your scheduled study reminders after a device restart, so they continue to fire at the times you chose. It is never used for tracking.</li>

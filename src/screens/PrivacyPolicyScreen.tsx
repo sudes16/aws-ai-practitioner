@@ -55,6 +55,7 @@ const SECTIONS: Section[] = [
     title: '4. Notifications',
     body:
       'The app uses device-local notifications to remind you to study at times you choose. Reminders are scheduled and delivered entirely on your device.\n\n' +
+      '• Notifications still appear on your device exactly when you scheduled them — the Android operating system handles delivery locally, even when offline.\n' +
       '• No external push servers (e.g., Firebase Cloud Messaging) are used.\n' +
       '• No device identifier or notification token is collected or transmitted.\n' +
       '• The RECEIVE_BOOT_COMPLETED permission is used solely to re-register your scheduled study reminders after a device restart, so they continue to fire at the times you chose. It is never used for tracking.',
