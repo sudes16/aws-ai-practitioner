@@ -692,7 +692,7 @@ export default function HomeScreen({ navigation }: Props) {
                 appMode === 'exam'
                   ? '🎓 Take Mock Exam →'
                   : poolSize === 0
-                    ? '🚫 No questions in this filter'
+                    ? '🚫 Range has 0 questions'
                     : '🎯 Start Practice →'
               }</Text>}
         </TouchableOpacity>

@@ -75,9 +75,9 @@ export default function OnboardingScreen({ navigation, route }: Props) {
       await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
     }
     if (isReplay) {
-      navigation.navigate('Home');
+      navigation.navigate('Main');
     } else {
-      navigation.replace('Home');
+      navigation.replace('Main');
     }
   };
 

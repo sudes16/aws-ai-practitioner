@@ -87,12 +87,12 @@ function MainTabs() {
 }
 
 export default function AppNavigator() {
-  const [initialRoute, setInitialRoute] = useState<'Home' | 'Onboarding' | null>(null);
+  const [initialRoute, setInitialRoute] = useState<'Main' | 'Onboarding' | null>(null);
 
   useEffect(() => {
     AsyncStorage.getItem('onboarding_complete')
       .then(val => {
-        setInitialRoute(val === 'true' ? 'Home' : 'Onboarding');
+        setInitialRoute(val === 'true' ? 'Main' : 'Onboarding');
       })
       .catch(() => setInitialRoute('Onboarding'));
   }, []);
@@ -107,7 +107,7 @@ export default function AppNavigator() {
           screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
         >
         <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-        <Stack.Screen name="Home" component={MainTabs} />
+        <Stack.Screen name="Main" component={MainTabs} />
         <Stack.Screen name="Quiz" component={QuizScreen} />
         <Stack.Screen name="Result" component={ResultScreen} />
         <Stack.Screen

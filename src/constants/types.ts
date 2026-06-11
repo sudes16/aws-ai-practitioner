@@ -61,6 +61,7 @@ export interface QuizConfig {
 
 export type RootStackParamList = {
   Onboarding: { replay?: boolean } | undefined;
+  Main: undefined;
   Home: undefined;
   Quiz: { config: QuizConfig };
   Result: {

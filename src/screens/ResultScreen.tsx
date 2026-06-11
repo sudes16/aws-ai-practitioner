@@ -272,7 +272,7 @@ export default function ResultScreen({ navigation, route }: Props) {
       <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.footerBtn, styles.footerBtnHome, styles.footerBtnHalf]}
-          onPress={() => navigation.replace('Home')}
+          onPress={() => navigation.replace('Main')}
         >
           <Text style={styles.footerBtnHomeText}>✕ Close</Text>
         </TouchableOpacity>

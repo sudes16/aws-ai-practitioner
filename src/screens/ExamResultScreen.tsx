@@ -209,7 +209,7 @@ export default function ExamResultScreen({ navigation }: Props) {
       <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.homeBtn, styles.footerBtnHalf]}
-          onPress={() => navigation.navigate('Home')}
+          onPress={() => navigation.navigate('Main')}
         >
           <Text style={styles.homeBtnText}>✕ Close</Text>
         </TouchableOpacity>
