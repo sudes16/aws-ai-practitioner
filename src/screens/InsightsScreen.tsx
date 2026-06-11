@@ -204,7 +204,7 @@ export default function InsightsScreen({ navigation }: Props) {
     return (
       <ScrollView
         ref={r => { scrollRefs.current[tabKey] = r; }}
-        style={{ width: screenWidth }}
+        style={{ width: screenWidth, backgroundColor: colors.background }}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
@@ -401,7 +401,7 @@ export default function InsightsScreen({ navigation }: Props) {
         />
       </View>
 
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
         <FlatList
           ref={flatListRef}
           data={TABS.map(t => t.key)}

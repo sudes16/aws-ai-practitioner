@@ -294,9 +294,7 @@ export default function SettingsScreen({ navigation }: Props) {
                         <>
                           <Text style={{ color: colors.textMuted }}>{'  |  '}</Text>
                           <Text style={[styles.profileDaysTag, { color: colors.correct }]}>
-                            {profile.passedDate
-                              ? `🏆 Passed ${new Date(profile.passedDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-                              : '🏆 Certified'}
+                            {'🏆 Certified'}
                           </Text>
                         </>
                       ) : daysLeft !== null && (
