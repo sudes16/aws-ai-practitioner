@@ -45,3 +45,24 @@ __pycache__/
 # Dev-only scripts
 setup.ps1
 generate_assets.py
+
+# EAS / native build artifacts that may land in project root
+*.aab
+*.apk
+*.ipa
+
+# Metro / Expo generated files
+.metro-health-check*
+expo-env.d.ts
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Test coverage
+coverage/
+
+# Firebase / Google Services config (defensive — never commit these)
+google-services.json
+GoogleService-Info.plist
+serviceAccountKey.json
+*.pem

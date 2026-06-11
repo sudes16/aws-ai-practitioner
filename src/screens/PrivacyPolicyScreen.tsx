@@ -15,8 +15,8 @@ import { ColorScheme } from '../constants/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PrivacyPolicy'>;
 
-const LAST_UPDATED = 'May 29, 2026';
-const APP_NAME = 'AWS AI Practitioner – AIF-C01 Quiz';
+const LAST_UPDATED = 'June 11, 2026';
+const APP_NAME = 'AWS AI Practitioner Prep – AIF-C01 Quiz';
 const CONTACT_EMAIL = 'sudesh6112@gmail.com';
 
 interface Section {
@@ -48,12 +48,16 @@ const SECTIONS: Section[] = [
       'The app offers optional "Deep Dive with AI" features powered by Google Gemini.\n\n' +
       '• Use of API Key: Users provide their own Gemini API key. This key is stored securely in your device\'s local storage and is used only to authenticate requests to Google.\n' +
       '• Data Transmission: When you request an AI explanation, only the question text and answer options are sent to Google\'s servers. No personal information or device identifiers are sent with these requests.\n' +
-      '• Data Processing: AI-generated content is provided for educational purposes and should be verified against official AWS documentation.',
+      '• Data Processing: AI-generated content is provided for educational purposes and should be verified against official AWS documentation.\n\n' +
+      'Once your request reaches Google\'s servers, it is governed by Google\'s Privacy Policy (https://policies.google.com/privacy) and the Gemini API terms.',
   },
   {
-    title: '4. Push Notifications',
+    title: '4. Notifications',
     body:
-      'We use local notifications for study reminders. On Android devices, a system identifier may be used to deliver these alerts. No data regarding your notification preferences is shared with third parties.',
+      'The app uses device-local notifications to remind you to study at times you choose. Reminders are scheduled and delivered entirely on your device.\n\n' +
+      '• No external push servers (e.g., Firebase Cloud Messaging) are used.\n' +
+      '• No device identifier or notification token is collected or transmitted.\n' +
+      '• The RECEIVE_BOOT_COMPLETED permission is used solely to re-register your scheduled study reminders after a device restart, so they continue to fire at the times you chose. It is never used for tracking.',
   },
   {
     title: '5. Data We Do NOT Collect',
