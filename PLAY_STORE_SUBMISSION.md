@@ -1,7 +1,7 @@
 # Google Play Store Submission Guide
 
 > **App:** AWS AI Practitioner Prep (`com.awsquiz.aifpractitioner`)
-> **Last updated:** June 11, 2026
+> **Last updated:** May 31, 2026 (Sync with Gold Build)
 
 This is a self-contained checklist for uploading this app to Google Play Console.
 Every question Play Console will ask you, with the exact answer that matches the
@@ -11,16 +11,18 @@ shipping code + the published privacy policy.
 
 ## Part 1 — Before You Open Play Console
 
-### 1.1 Bump version
+### 1.1 Bump version (Local source of truth)
 
 Edit [app.json](app.json):
 - `expo.version` → bump for users (e.g. `1.0.0` → `1.0.1`)
-- `expo.android.versionCode` → **must increment** for every AAB upload (currently `5` → next `6`)
+- `expo.android.versionCode` → **must increment** for every AAB upload (use **6** or higher if version 4/5 were rejected)
+
+Note: `eas.json` is configured with `appVersionSource: "local"`, so the values in `app.json` will be respected during builds.
 
 ### 1.2 Build the AAB
 
+Run from your project root:
 ```powershell
-cd "C:\Users\A5U58AV\OneDrive-Deere&Co\OneDrive - Deere & Co\Desktop\AWS AI Certification\aws-ai-practitioner-quiz"
 eas build --platform android --profile production
 ```
 
@@ -31,6 +33,7 @@ Wait for EAS to finish (usually 10–20 min). Download the `.aab` file from the 
 Push the updated `privacy-policy.html` to wherever it's currently hosted
 (GitHub Pages, Netlify, etc.). The URL must remain the same as what you give
 to Play Console below — and the HTML there must match the version in this repo.
+**Recommended URL:** `https://sudes16.github.io/aws-ai-practitioner/privacy-policy.html` (verify your hosting)
 
 ### 1.4 Take screenshots
 
