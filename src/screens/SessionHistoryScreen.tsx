@@ -236,16 +236,7 @@ export default function SessionHistoryScreen({ navigation }: Props) {
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.goBack()}
-          accessibilityLabel="Back"
-          accessibilityRole="button"
-        >
-          <Text style={styles.backBtnText}>←</Text>
-        </TouchableOpacity>
         <Text style={styles.headerTitle}>📋 History</Text>
-        <View style={{ width: 44 }} />
       </View>
 
       {/* Tabs */}
@@ -321,14 +312,6 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: colors.awsDark,
   },
-  backBtn: {
-    width: 44, height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  backBtnText: { color: '#fff', fontSize: 20, fontWeight: '600' },
   headerTitle: {
     flex: 1,
     textAlign: 'center',

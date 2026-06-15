@@ -13,7 +13,9 @@ import {
   FlatList,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  Platform,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -154,10 +156,14 @@ export default function HomeScreen({ navigation }: Props) {
   const [profile, setProfile]           = useState<UserProfile | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [obName, setObName]             = useState('');
-  const [obMonth, setObMonth]           = useState('');
-  const [obDay, setObDay]               = useState('');
-  const [obYear, setObYear]             = useState('');
+  const [obDate, setObDate]             = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [obError, setObError]           = useState('');
+
+  const examMinDate = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d; }, []);
+  const examMaxDate = useMemo(() => { const d = new Date(); d.setFullYear(d.getFullYear() + 3); return d; }, []);
+  const formatExamDate = (d: Date | null) =>
+    d ? d.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' }) : '';
   const isNarrow = screenWidth < 600;
 
   const [showPostExamModal, setShowPostExamModal] = useState(false);
@@ -200,7 +206,7 @@ export default function HomeScreen({ navigation }: Props) {
     await setPostExamPromptDismissed(profile.examDate);
     setShowPostExamModal(false);
     setObName(profile.name);
-    setObMonth(''); setObDay(''); setObYear('');
+    setObDate(null);
     setObError('');
     setShowOnboarding(true);
   };
@@ -212,7 +218,14 @@ export default function HomeScreen({ navigation }: Props) {
   };
 
   const handleSaveProfile = async () => {
-    const result = validateProfileInputs(obName, obMonth, obDay, obYear);
+    if (!obDate) {
+      setObError('Please select your exam date.');
+      return;
+    }
+    const m = String(obDate.getMonth() + 1);
+    const d = String(obDate.getDate());
+    const y = String(obDate.getFullYear());
+    const result = validateProfileInputs(obName, m, d, y);
     if (typeof result === 'string') { setObError(result); return; }
     try {
       await saveProfile(result);
@@ -614,8 +627,7 @@ export default function HomeScreen({ navigation }: Props) {
           if (isPassed) { navigation.navigate('Settings'); return; }
           if (days < 0) { setShowPostExamModal(true); return; }
           setObName(profile.name);
-          const [y, m, d] = profile.examDate.split('-');
-          setObYear(y); setObMonth(m); setObDay(d);
+          setObDate(new Date(profile.examDate + 'T00:00:00'));
           setObError('');
           setShowOnboarding(true);
         };
@@ -638,14 +650,29 @@ export default function HomeScreen({ navigation }: Props) {
           color = colors.awsOrange;
         }
         return (
-          <TouchableOpacity
-            style={styles.countdownBanner}
-            activeOpacity={0.8}
-            onPress={onBannerPress}
-          >
-            <Text style={styles.countdownName}>{new Date().getHours() < 12 ? '🌅 Good morning' : '☀️ Good afternoon'}{', '}{profile.name}{'!'}</Text>
-            <Text style={[styles.countdownDays, { color }]}>{label}</Text>
-          </TouchableOpacity>
+          <View style={styles.countdownBanner}>
+            <Text style={styles.countdownName} numberOfLines={1}>
+              {new Date().getHours() < 12 ? '🌅 Good morning' : '☀️ Good afternoon'}{', '}{profile.name}{'!'}
+            </Text>
+            <View style={styles.countdownLabelWrap}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.countdownLabelScroll}
+              >
+                <TouchableOpacity activeOpacity={0.7} onPress={onBannerPress}>
+                  <Text style={[styles.countdownDays, { color }]}>{label}</Text>
+                </TouchableOpacity>
+              </ScrollView>
+              {/* Faux right-edge fade hinting more content is scrollable */}
+              <View pointerEvents="none" style={styles.countdownFadeWrap}>
+                <View style={[styles.countdownFadeStrip, { backgroundColor: 'rgba(26,43,76,0.35)' }]} />
+                <View style={[styles.countdownFadeStrip, { backgroundColor: 'rgba(26,43,76,0.65)' }]} />
+                <View style={[styles.countdownFadeStrip, { backgroundColor: 'rgba(26,43,76,0.9)' }]} />
+                <View style={[styles.countdownFadeStrip, { backgroundColor: colors.awsDark }]} />
+              </View>
+            </View>
+          </View>
         );
       })()}
 
@@ -717,46 +744,67 @@ export default function HomeScreen({ navigation }: Props) {
             />
 
             <Text style={styles.obLabel}>Exam date</Text>
-            <View style={styles.obDateRow}>
-              <View style={styles.obDateField}>
-                <Text style={styles.obDateHint}>Month</Text>
-                <TextInput
-                  style={styles.obDateInput}
-                  placeholder="MM"
-                  placeholderTextColor={colors.textMuted}
-                  value={obMonth}
-                  onChangeText={t => { setObMonth(t.replace(/\D/g,'')); setObError(''); }}
-                  keyboardType="number-pad"
-                  maxLength={2}
-                />
-              </View>
-              <Text style={styles.obDateSep}>/</Text>
-              <View style={styles.obDateField}>
-                <Text style={styles.obDateHint}>Day</Text>
-                <TextInput
-                  style={styles.obDateInput}
-                  placeholder="DD"
-                  placeholderTextColor={colors.textMuted}
-                  value={obDay}
-                  onChangeText={t => { setObDay(t.replace(/\D/g,'')); setObError(''); }}
-                  keyboardType="number-pad"
-                  maxLength={2}
-                />
-              </View>
-              <Text style={styles.obDateSep}>/</Text>
-              <View style={[styles.obDateField, { flex: 2 }]}>
-                <Text style={styles.obDateHint}>Year</Text>
-                <TextInput
-                  style={styles.obDateInput}
-                  placeholder="YYYY"
-                  placeholderTextColor={colors.textMuted}
-                  value={obYear}
-                  onChangeText={t => { setObYear(t.replace(/\D/g,'')); setObError(''); }}
-                  keyboardType="number-pad"
-                  maxLength={4}
-                />
-              </View>
-            </View>
+            {Platform.OS === 'web' ? (
+              // @ts-ignore — native HTML input on react-native-web
+              <input
+                type="date"
+                value={obDate ? obDate.toISOString().slice(0, 10) : ''}
+                min={examMinDate.toISOString().slice(0, 10)}
+                max={examMaxDate.toISOString().slice(0, 10)}
+                onChange={(e: any) => {
+                  const v = e.target.value;
+                  setObDate(v ? new Date(v + 'T00:00:00') : null);
+                  setObError('');
+                }}
+                style={{
+                  border: `1.5px solid ${colors.border}`,
+                  borderRadius: 10,
+                  padding: '12px 14px',
+                  fontSize: 16,
+                  color: colors.textPrimary,
+                  backgroundColor: colors.background,
+                  marginBottom: 20,
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  fontFamily: 'inherit',
+                }}
+              />
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={styles.obDateBtn}
+                  onPress={() => { setShowDatePicker(true); setObError(''); }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.obDateBtnText, !obDate && styles.obDateBtnPlaceholder]}>
+                    {obDate ? formatExamDate(obDate) : 'Tap to pick a date'}
+                  </Text>
+                  <Text style={styles.obDateBtnIcon}>📅</Text>
+                </TouchableOpacity>
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={obDate ?? examMinDate}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    minimumDate={examMinDate}
+                    maximumDate={examMaxDate}
+                    onChange={(event, selected) => {
+                      if (Platform.OS !== 'ios') setShowDatePicker(false);
+                      if (event.type === 'set' && selected) setObDate(selected);
+                      else if (event.type === 'dismissed') setShowDatePicker(false);
+                    }}
+                  />
+                )}
+                {Platform.OS === 'ios' && showDatePicker && (
+                  <TouchableOpacity
+                    style={styles.obDateDoneBtn}
+                    onPress={() => setShowDatePicker(false)}
+                  >
+                    <Text style={styles.obDateDoneText}>Done</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
 
             {obError ? <Text style={styles.obError}>{obError}</Text> : null}
 
@@ -949,8 +997,12 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   startBtnDisabled: { opacity: 0.7 },
   startBtnText: { fontSize: 17, fontWeight: '800', color: '#FFFFFF' },
 
-  countdownBanner: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: colors.awsDark, paddingHorizontal: 16, paddingBottom: 10 },
-  countdownName: { fontSize: 13, color: 'rgba(255,255,255,0.75)' },
+  countdownBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.awsDark, paddingHorizontal: 16, paddingBottom: 10, gap: 10 },
+  countdownName: { fontSize: 13, color: 'rgba(255,255,255,0.75)', flexShrink: 1 },
+  countdownLabelWrap: { flex: 1, overflow: 'hidden', position: 'relative' },
+  countdownLabelScroll: { flexGrow: 1, justifyContent: 'flex-end', alignItems: 'center', paddingRight: 4 },
+  countdownFadeWrap: { position: 'absolute', right: 0, top: 0, bottom: 0, flexDirection: 'row' },
+  countdownFadeStrip: { width: 6, height: '100%' },
   countdownDays: { fontSize: 13, fontWeight: '700' },
 
   obOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 24 },
@@ -959,11 +1011,12 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   obSubtitle: { fontSize: 14, color: colors.textSecondary, marginBottom: 24 },
   obLabel: { fontSize: 12, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 },
   obInput: { borderWidth: 1.5, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, color: colors.textPrimary, backgroundColor: colors.background, marginBottom: 20 },
-  obDateRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginBottom: 20 },
-  obDateField: { flex: 1, alignItems: 'center' },
-  obDateHint: { fontSize: 10, color: colors.textMuted, fontWeight: '600', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 },
-  obDateInput: { borderWidth: 1.5, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 12, fontSize: 16, fontWeight: '600', textAlign: 'center', color: colors.textPrimary, backgroundColor: colors.background, width: '100%' },
-  obDateSep: { fontSize: 20, color: colors.textMuted, fontWeight: '700', paddingBottom: 10 },
+  obDateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1.5, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 14, backgroundColor: colors.background, marginBottom: 20 },
+  obDateBtnText: { fontSize: 16, fontWeight: '600', color: colors.textPrimary, flex: 1 },
+  obDateBtnPlaceholder: { color: colors.textMuted, fontWeight: '400' },
+  obDateBtnIcon: { fontSize: 18, marginLeft: 8 },
+  obDateDoneBtn: { alignSelf: 'flex-end', paddingHorizontal: 16, paddingVertical: 8, marginBottom: 12 },
+  obDateDoneText: { fontSize: 15, fontWeight: '700', color: colors.awsOrange },
   obError: { fontSize: 13, color: colors.wrong, marginBottom: 12, fontWeight: '600' },
   obBtn: { backgroundColor: colors.awsOrange, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 4 },
   obBtnText: { fontSize: 16, fontWeight: '800', color: '#fff' },

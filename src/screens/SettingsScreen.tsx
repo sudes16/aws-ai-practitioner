@@ -12,6 +12,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import Constants from 'expo-constants';
@@ -50,10 +51,14 @@ export default function SettingsScreen({ navigation }: Props) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [editing, setEditing]   = useState(false);
   const [obName, setObName]     = useState('');
-  const [obMonth, setObMonth]   = useState('');
-  const [obDay, setObDay]       = useState('');
-  const [obYear, setObYear]     = useState('');
+  const [obDate, setObDate]     = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [obError, setObError]   = useState('');
+
+  const examMinDate = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d; }, []);
+  const examMaxDate = useMemo(() => { const d = new Date(); d.setFullYear(d.getFullYear() + 3); return d; }, []);
+  const formatExamDate = (d: Date | null) =>
+    d ? d.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' }) : '';
 
   // ── AI Key state ──
   const [aiKey, setAiKey] = useState('');
@@ -96,11 +101,8 @@ export default function SettingsScreen({ navigation }: Props) {
 
           if (p) {
             setProfile(p);
-            const [y, m, d] = p.examDate.split('-');
             setObName(p.name);
-            setObMonth(m);
-            setObDay(d);
-            setObYear(y);
+            setObDate(new Date(p.examDate + 'T00:00:00'));
           }
           setAiKey(k ?? '');
           setExamSeenCount(es);
@@ -124,7 +126,14 @@ export default function SettingsScreen({ navigation }: Props) {
   );
 
   const handleSave = async () => {
-    const result = validateProfileInputs(obName, obMonth, obDay, obYear);
+    if (!obDate) {
+      setObError('Please select your exam date.');
+      return;
+    }
+    const m = String(obDate.getMonth() + 1);
+    const d = String(obDate.getDate());
+    const y = String(obDate.getFullYear());
+    const result = validateProfileInputs(obName, m, d, y);
     if (typeof result === 'string') { setObError(result); return; }
     try {
       await saveProfile(result);
@@ -256,11 +265,7 @@ export default function SettingsScreen({ navigation }: Props) {
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backBtnText}>←</Text>
-        </TouchableOpacity>
         <Text style={styles.headerTitle}>⚙️ Settings</Text>
-        <View style={{ width: 36 }} />
       </View>
 
       <ScrollView
@@ -329,46 +334,68 @@ export default function SettingsScreen({ navigation }: Props) {
                 maxLength={40}
               />
               <Text style={styles.fieldLabel}>Exam date</Text>
-              <View style={styles.dateRow}>
-                <View style={styles.dateField}>
-                  <Text style={styles.dateHint}>Month</Text>
-                  <TextInput
-                    style={styles.dateInput}
-                    value={obMonth}
-                    onChangeText={t => { setObMonth(t.replace(/\D/g, '')); setObError(''); }}
-                    placeholder="MM"
-                    placeholderTextColor={colors.textMuted}
-                    keyboardType="number-pad"
-                    maxLength={2}
-                  />
-                </View>
-                <Text style={styles.dateSep}>/</Text>
-                <View style={styles.dateField}>
-                  <Text style={styles.dateHint}>Day</Text>
-                  <TextInput
-                    style={styles.dateInput}
-                    value={obDay}
-                    onChangeText={t => { setObDay(t.replace(/\D/g, '')); setObError(''); }}
-                    placeholder="DD"
-                    placeholderTextColor={colors.textMuted}
-                    keyboardType="number-pad"
-                    maxLength={2}
-                  />
-                </View>
-                <Text style={styles.dateSep}>/</Text>
-                <View style={[styles.dateField, { flex: 2 }]}>
-                  <Text style={styles.dateHint}>Year</Text>
-                  <TextInput
-                    style={styles.dateInput}
-                    value={obYear}
-                    onChangeText={t => { setObYear(t.replace(/\D/g, '')); setObError(''); }}
-                    placeholder="YYYY"
-                    placeholderTextColor={colors.textMuted}
-                    keyboardType="number-pad"
-                    maxLength={4}
-                  />
-                </View>
-              </View>
+              {Platform.OS === 'web' ? (
+                // @ts-ignore — native HTML input on react-native-web
+                <input
+                  type="date"
+                  value={obDate ? obDate.toISOString().slice(0, 10) : ''}
+                  min={examMinDate.toISOString().slice(0, 10)}
+                  max={examMaxDate.toISOString().slice(0, 10)}
+                  onChange={(e: any) => {
+                    const v = e.target.value;
+                    setObDate(v ? new Date(v + 'T00:00:00') : null);
+                    setObError('');
+                  }}
+                  style={{
+                    border: `1.5px solid ${colors.border}`,
+                    borderRadius: 10,
+                    padding: '11px 14px',
+                    fontSize: 15,
+                    color: colors.textPrimary,
+                    backgroundColor: colors.background,
+                    marginLeft: 16,
+                    marginRight: 16,
+                    marginBottom: 16,
+                    boxSizing: 'border-box',
+                    fontFamily: 'inherit',
+                  }}
+                />
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={styles.dateBtn}
+                    onPress={() => { setShowDatePicker(true); setObError(''); }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.dateBtnText, !obDate && styles.dateBtnPlaceholder]}>
+                      {obDate ? formatExamDate(obDate) : 'Tap to pick a date'}
+                    </Text>
+                    <Text style={styles.dateBtnIcon}>📅</Text>
+                  </TouchableOpacity>
+                  {showDatePicker && (
+                    <DateTimePicker
+                      value={obDate ?? examMinDate}
+                      mode="date"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      minimumDate={examMinDate}
+                      maximumDate={examMaxDate}
+                      onChange={(event, selected) => {
+                        if (Platform.OS !== 'ios') setShowDatePicker(false);
+                        if (event.type === 'set' && selected) setObDate(selected);
+                        else if (event.type === 'dismissed') setShowDatePicker(false);
+                      }}
+                    />
+                  )}
+                  {Platform.OS === 'ios' && showDatePicker && (
+                    <TouchableOpacity
+                      style={styles.dateDoneBtn}
+                      onPress={() => setShowDatePicker(false)}
+                    >
+                      <Text style={styles.dateDoneText}>Done</Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
               {obError ? <Text style={styles.errorText}>{obError}</Text> : null}
               <View style={styles.editBtnRow}>
                 <TouchableOpacity
@@ -697,18 +724,11 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 14,
     backgroundColor: colors.awsDark,
   },
-  backBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  backBtnText: { color: '#fff', fontSize: 20, fontWeight: '700', lineHeight: 22 },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: colors.textLight },
+  headerTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '800', color: colors.textLight },
 
   scroll: { flex: 1, backgroundColor: colors.background },
   scrollContent: { padding: 16 },
@@ -778,6 +798,18 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     color: colors.textPrimary, backgroundColor: colors.background, width: '100%',
   },
   dateSep: { fontSize: 18, color: colors.textMuted, fontWeight: '700', paddingBottom: 10 },
+  dateBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderWidth: 1.5, borderColor: colors.border, borderRadius: 10,
+    paddingHorizontal: 14, paddingVertical: 12,
+    backgroundColor: colors.background,
+    marginHorizontal: 16, marginBottom: 16,
+  },
+  dateBtnText: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, flex: 1 },
+  dateBtnPlaceholder: { color: colors.textMuted, fontWeight: '400' },
+  dateBtnIcon: { fontSize: 17, marginLeft: 8 },
+  dateDoneBtn: { alignSelf: 'flex-end', paddingHorizontal: 16, paddingVertical: 8, marginRight: 16, marginBottom: 8 },
+  dateDoneText: { fontSize: 15, fontWeight: '700', color: colors.awsOrange },
   errorText: { fontSize: 13, color: colors.wrong, fontWeight: '600', marginHorizontal: 16, marginBottom: 8 },
   editBtnRow: { flexDirection: 'row', gap: 10, margin: 16, marginTop: 4 },
   cancelBtn: {
