@@ -1,7 +1,7 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, Image, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Image, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import AppNavigator from './src/navigation/AppNavigator';
@@ -36,17 +36,25 @@ export default function App() {
     loadData();
   }, []);
 
-  // Stage 2: Minimal handoff loader (splash already showed full branding)
+  // Stage 2: High-Contrast Loading UI
   if (!isReady) {
     return (
       <View style={styles.loadingContainer}>
         <StatusBar style="light" />
-        <Image
-          source={require('./assets/icon.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <ActivityIndicator size="small" color="#FF9900" style={{ marginTop: 24 }} />
+        <View style={styles.content}>
+          <Image
+            source={require('./assets/icon.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <Text style={styles.title}>AWS AI Practitioner</Text>
+          <Text style={styles.subtitle}>AIF-C01 Quiz</Text>
+
+          <View style={styles.loaderArea}>
+             <ActivityIndicator size="small" color="#FF9900" style={{ marginVertical: 24 }} />
+             <Text style={styles.tagline}>STUDY SMART. PASS FAST.</Text>
+          </View>
+        </View>
       </View>
     );
   }
@@ -70,8 +78,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  content: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    paddingBottom: 40,
+  },
   logo: {
     width: 140,
     height: 140,
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  subtitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FF9900',
+    marginTop: 4,
+    textTransform: 'uppercase',
+  },
+  loaderArea: {
+    marginTop: 40,
+    alignItems: 'center',
+  },
+  tagline: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 2.5,
+    opacity: 0.95,
   },
 });
