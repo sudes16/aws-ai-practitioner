@@ -3,6 +3,13 @@ import { HistoryEntry } from '../constants/types';
 
 const MASTERED_KEY = 'aws_quiz_mastered_questions';
 
+// ── Insights cache invalidation ────────────────────────────────────────────
+// Bumped by any write that affects InsightsScreen's three data sources.
+// InsightsScreen reads this to decide whether its in-memory cache is stale.
+let insightsDataVersion = 0;
+export const getInsightsDataVersion = (): number => insightsDataVersion;
+const bumpInsightsVersion = () => { insightsDataVersion++; };
+
 // ── Mastered questions (answered correctly at least once) ──────────────────
 
 export const getMasteredQuestions = async (): Promise<number[]> => {
@@ -19,6 +26,7 @@ export const addMasteredQuestions = async (numbers: number[]): Promise<void> => 
     const existing = await getMasteredQuestions();
     const merged = Array.from(new Set([...existing, ...numbers]));
     await AsyncStorage.setItem(MASTERED_KEY, JSON.stringify(merged));
+    bumpInsightsVersion();
   } catch {
     // silently fail
   }
@@ -30,6 +38,7 @@ export const removeMasteredQuestions = async (numbers: number[]): Promise<void> 
     const set = new Set(existing);
     numbers.forEach(n => set.delete(n));
     await AsyncStorage.setItem(MASTERED_KEY, JSON.stringify(Array.from(set)));
+    bumpInsightsVersion();
   } catch {
     // silently fail
   }
@@ -43,6 +52,7 @@ export const getMasteredCount = async (): Promise<number> => {
 export const resetMasteredQuestions = async (): Promise<void> => {
   try {
     await AsyncStorage.removeItem(MASTERED_KEY);
+    bumpInsightsVersion();
   } catch {
     // silently fail
   }
@@ -119,6 +129,7 @@ export const addScoreSession = async (session: ScoreSession): Promise<void> => {
     existing.unshift(session);
     if (existing.length > MAX_SCORE_HISTORY) existing.length = MAX_SCORE_HISTORY;
     await AsyncStorage.setItem(SCORE_HISTORY_KEY, JSON.stringify(existing));
+    bumpInsightsVersion();
   } catch {
     // silently fail
   }
@@ -136,6 +147,7 @@ export const getScoreHistory = async (): Promise<ScoreSession[]> => {
 export const clearScoreHistory = async (): Promise<void> => {
   try {
     await AsyncStorage.removeItem(SCORE_HISTORY_KEY);
+    bumpInsightsVersion();
   } catch {
     // silently fail
   }
@@ -165,6 +177,7 @@ export const saveSessionRecord = async (record: SessionRecord): Promise<void> =>
     existing.unshift(record);
     if (existing.length > MAX_SESSION_RECORDS) existing.length = MAX_SESSION_RECORDS;
     await AsyncStorage.setItem(SESSION_RECORDS_KEY, JSON.stringify(existing));
+    bumpInsightsVersion();
   } catch {
     // silently fail
   }
@@ -182,6 +195,7 @@ export const getSessionRecords = async (): Promise<SessionRecord[]> => {
 export const clearSessionRecords = async (): Promise<void> => {
   try {
     await AsyncStorage.removeItem(SESSION_RECORDS_KEY);
+    bumpInsightsVersion();
   } catch {
     // silently fail
   }

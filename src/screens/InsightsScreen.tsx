@@ -21,6 +21,7 @@ import {
   getScoreHistory,
   getMasteredCount,
   getSessionRecords,
+  getInsightsDataVersion,
   ScoreSession,
   SessionRecord,
 } from '../utils/storage';
@@ -49,17 +50,32 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'exam',     label: 'Exam' },
 ];
 
+// Module-level cache: survives tab switches; invalidated via getInsightsDataVersion().
+type InsightsCache = {
+  version: number;
+  scoreHistory: ScoreSession[];
+  masteredCount: number;
+  sessionRecords: SessionRecord[];
+};
+let insightsCache: InsightsCache | null = null;
+
 export default function InsightsScreen({ navigation }: Props) {
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const shared = useMemo(() => SHARED_STYLES(colors), [colors]);
   const { width: screenWidth } = useWindowDimensions();
 
-  const [scoreHistory, setScoreHistory] = useState<ScoreSession[]>([]);
+  const [scoreHistory, setScoreHistory] = useState<ScoreSession[]>(
+    () => insightsCache?.scoreHistory ?? []
+  );
   const [activeTab, setActiveTab] = useState<TabKey>('all');
-  const [masteredCount, setMasteredCount] = useState(0);
-  const [sessionRecords, setSessionRecords] = useState<SessionRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [masteredCount, setMasteredCount] = useState(
+    () => insightsCache?.masteredCount ?? 0
+  );
+  const [sessionRecords, setSessionRecords] = useState<SessionRecord[]>(
+    () => insightsCache?.sessionRecords ?? []
+  );
+  const [loading, setLoading] = useState(insightsCache === null);
   const [practiceTarget, setPracticeTarget] = useState<DomainFilter | null>(null);
   const totalQCount = getTotalCount();
 
@@ -86,8 +102,9 @@ export default function InsightsScreen({ navigation }: Props) {
     index,
   });
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (showSpinner: boolean) => {
+    if (showSpinner) setLoading(true);
+    const versionAtFetch = getInsightsDataVersion();
     const [h, mc, sr] = await Promise.all([
       getScoreHistory(),
       getMasteredCount(),
@@ -96,11 +113,26 @@ export default function InsightsScreen({ navigation }: Props) {
     setScoreHistory(h);
     setMasteredCount(mc);
     setSessionRecords(sr);
-    setLoading(false);
+    insightsCache = {
+      version: versionAtFetch,
+      scoreHistory: h,
+      masteredCount: mc,
+      sessionRecords: sr,
+    };
+    if (showSpinner) setLoading(false);
   }, []);
 
   useFocusEffect(useCallback(() => {
-    loadData();
+    const currentVersion = getInsightsDataVersion();
+    if (insightsCache && insightsCache.version === currentVersion) {
+      // Cache is fresh — nothing to do, render is already instant from cached state.
+    } else if (insightsCache) {
+      // Cache exists but stale — refresh silently in background, no spinner.
+      loadData(false);
+    } else {
+      // Cold start — spinner is OK.
+      loadData(true);
+    }
     // Synchronized Reset: Scroll ALL horizontal pages back to top when entering
     Object.values(scrollRefs.current).forEach(ref => ref?.scrollTo({ y: 0, animated: false }));
   }, [loadData]));
