@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Share,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -75,6 +76,9 @@ export default function QuizScreen({ navigation, route }: Props) {
   // Notes & Reports
   const [showNoteSheet, setShowNoteSheet] = useState(false);
   const [noteInput, setNoteInput] = useState('');
+  const [toast, setToast] = useState<{ msg: string; tone: 'success' | 'error' } | null>(null);
+  const toastOpacity = useRef(new Animated.Value(0)).current;
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [reportedSet, setReportedSet] = useState<Set<number>>(new Set());
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportCategory, setReportCategory] = useState<QuestionReport['category']>('wrong_answer');
@@ -501,11 +505,40 @@ export default function QuizScreen({ navigation, route }: Props) {
     setShowNoteSheet(true);
   };
 
+  const showToast = useCallback((msg: string, tone: 'success' | 'error' = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ msg, tone });
+    if (Platform.OS !== 'web') {
+      const style = tone === 'success'
+        ? Haptics.NotificationFeedbackType.Success
+        : Haptics.NotificationFeedbackType.Error;
+      Haptics.notificationAsync(style).catch(() => {});
+    }
+    Animated.timing(toastOpacity, { toValue: 1, duration: 180, useNativeDriver: true }).start();
+    toastTimerRef.current = setTimeout(() => {
+      Animated.timing(toastOpacity, { toValue: 0, duration: 280, useNativeDriver: true })
+        .start(() => setToast(null));
+    }, 1600);
+  }, [toastOpacity]);
+
+  useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
+
   const handleNoteSave = async () => {
     if (!displayQuestion) return;
     const qNum = displayQuestion.number;
-    await saveNote(qNum, noteInput);
-    setShowNoteSheet(false);
+    const trimmed = noteInput.trim();
+    const hadExistingNote = !!(notesMap[qNum] && notesMap[qNum].trim().length > 0);
+    try {
+      await saveNote(qNum, trimmed);
+      setShowNoteSheet(false);
+      if (!trimmed) {
+        if (hadExistingNote) showToast('✖ Note removed', 'success');
+      } else {
+        showToast('✓ Note saved', 'success');
+      }
+    } catch (e) {
+      showToast('⚠ Failed to save note', 'error');
+    }
   };
 
   const handleShareQuestion = async () => {
@@ -1174,10 +1207,10 @@ export default function QuizScreen({ navigation, route }: Props) {
                 const hasNote = q ? !!notesMap[q.number]?.trim() : false;
                 const matchesFilters =
                   examReviewFilters.size === 0 ||
-                  ((!examReviewFilters.has('answered') || hasAnswer) &&
-                   (!examReviewFilters.has('remaining') || !hasAnswer) &&
-                   (!examReviewFilters.has('flagged') || isFlaggedQ) &&
-                   (!examReviewFilters.has('noted') || hasNote));
+                  (examReviewFilters.has('answered')  && hasAnswer)  ||
+                  (examReviewFilters.has('remaining') && !hasAnswer) ||
+                  (examReviewFilters.has('flagged')   && isFlaggedQ) ||
+                  (examReviewFilters.has('noted')     && hasNote);
                 return (
                   <TouchableOpacity
                     key={i}
@@ -1194,7 +1227,11 @@ export default function QuizScreen({ navigation, route }: Props) {
                       setViewPos(i);
                     }}
                   >
-                    <Text style={[styles.examTileNum, hasAnswer && styles.examTileNumLight]}>
+                    <Text style={[
+                      styles.examTileNum,
+                      hasAnswer && styles.examTileNumLight,
+                      !hasAnswer && styles.examTileNumSkipped,
+                    ]}>
                       {i + 1}
                     </Text>
                     {isFlaggedQ && <Text style={styles.examTileFlag}>⚑</Text>}
@@ -1463,6 +1500,20 @@ export default function QuizScreen({ navigation, route }: Props) {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* ── Toast (note save feedback) ── */}
+      {toast && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.toast,
+            toast.tone === 'error' ? styles.toastError : styles.toastSuccess,
+            { opacity: toastOpacity },
+          ]}
+        >
+          <Text style={styles.toastText}>{toast.msg}</Text>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 }
@@ -2022,11 +2073,15 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   examTileSkipped: {
     backgroundColor: colors.background,
     borderColor: colors.border,
-    opacity: 0.5,
+  },
+  examTileNumSkipped: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: colors.textPrimary,
   },
   examTileFlagged: {
-    borderColor: colors.awsOrange,
-    borderWidth: 2,
+    borderColor: colors.border,
+    borderWidth: 1.5,
   },
   examTileFuture: {
     opacity: 0.25,
@@ -2041,9 +2096,11 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   },
   examTileFlag: {
     position: 'absolute',
-    top: 1,
-    right: 2,
-    fontSize: 8,
+    top: 2,
+    right: 3,
+    fontSize: 11,
+    color: colors.awsOrange,
+    fontWeight: '900',
   },
   examTileNote: {
     position: 'absolute',
@@ -2101,6 +2158,21 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     fontWeight: '700',
   },
   examTileDimmed: {
-    opacity: 0.35,
+    opacity: 0.18,
   },
+
+  toast: {
+    position: 'absolute',
+    bottom: 80,
+    alignSelf: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    borderRadius: 22,
+    maxWidth: '85%',
+    ...shadow('#000', 4, 0.25, 8),
+    elevation: 8,
+  },
+  toastSuccess: { backgroundColor: colors.correct },
+  toastError:   { backgroundColor: colors.wrong },
+  toastText:    { color: '#fff', fontSize: 14, fontWeight: '700', textAlign: 'center' },
 });
