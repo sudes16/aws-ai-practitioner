@@ -14,7 +14,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList, HistoryEntry } from '../constants/types';
 import { getAllQuestions } from '../utils/quizEngine';
-import { shadow } from '../utils/styleUtils';
+import { shadow, SHARED_STYLES } from '../utils/styleUtils';
 import { useTheme } from '../contexts/ThemeContext';
 import { ColorScheme } from '../constants/colors';
 import { formatDate } from '../utils/dateUtils';
@@ -37,6 +37,7 @@ export default function ReviewScreen({ navigation, route }: Props) {
   const questions = getAllQuestions();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const shared = useMemo(() => SHARED_STYLES(colors), [colors]);
   const { width: screenWidth } = useWindowDimensions();
 
   const [filter, setFilter] = useState<Filter>(initialFilter ?? 'all');
@@ -246,7 +247,7 @@ export default function ReviewScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
-      <View style={styles.header}>
+      <View style={[shared.header, { gap: 12 }]}>
         <TouchableOpacity
           style={styles.closeBtn}
           onPress={() => navigation.goBack()}
@@ -384,7 +385,7 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '800',
     color: colors.textLight,
     textAlign: 'center',

@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { shadow } from '../utils/styleUtils';
+import { shadow, SHARED_STYLES } from '../utils/styleUtils';
 import { RootStackParamList } from '../constants/types';
 import { useTheme } from '../contexts/ThemeContext';
 import { ColorScheme } from '../constants/colors';
@@ -101,10 +101,11 @@ const SECTIONS: Section[] = [
 export default function PrivacyPolicyScreen({ navigation }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const shared = useMemo(() => SHARED_STYLES(colors), [colors]);
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={shared.header}>
         <TouchableOpacity
           style={styles.backBtn}
           onPress={() => navigation.goBack()}
@@ -169,7 +170,7 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     justifyContent: 'center',
   },
   backBtnText: { color: '#fff', fontSize: 20, fontWeight: '700', lineHeight: 22 },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: colors.textLight },
+  headerTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '800', color: colors.textLight },
 
   scroll: { flex: 1, backgroundColor: colors.background },
   scrollContent: { padding: 16 },

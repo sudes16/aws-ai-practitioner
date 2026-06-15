@@ -26,7 +26,7 @@ import {
 } from '../utils/storage';
 import { useTheme } from '../contexts/ThemeContext';
 import { ColorScheme } from '../constants/colors';
-import { shadow } from '../utils/styleUtils';
+import { shadow, SHARED_STYLES } from '../utils/styleUtils';
 import { useNotes } from '../contexts/NotesContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SessionHistory'>;
@@ -51,6 +51,7 @@ function resolveAnswered(s: ScoreSession): number {
 export default function SessionHistoryScreen({ navigation }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const shared = useMemo(() => SHARED_STYLES(colors), [colors]);
   const { width: screenWidth } = useWindowDimensions();
 
   const [scoreHistory, setScoreHistory]   = useState<ScoreSession[]>([]);
@@ -235,7 +236,7 @@ export default function SessionHistoryScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={shared.header}>
         <Text style={styles.headerTitle}>📋 History</Text>
       </View>
 
@@ -305,19 +306,12 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   scroll: { flex: 1, backgroundColor: colors.background },
   scrollContent: { paddingHorizontal: 16, paddingTop: 16 },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    backgroundColor: colors.awsDark,
-  },
   headerTitle: {
     flex: 1,
     textAlign: 'center',
-    color: '#fff',
+    color: colors.textLight,
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
   },
 
   tabBar: {

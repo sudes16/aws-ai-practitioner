@@ -11,6 +11,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../constants/types';
 import { useTheme } from '../contexts/ThemeContext';
 import { ColorScheme } from '../constants/colors';
+import { SHARED_STYLES } from '../utils/styleUtils';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Help'>;
 
@@ -115,9 +116,10 @@ const SECTIONS: Section[] = [
 export default function HelpScreen({ navigation }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const shared = useMemo(() => SHARED_STYLES(colors), [colors]);
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
-      <View style={styles.header}>
+      <View style={shared.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Text style={styles.backBtnText}>←</Text>
         </TouchableOpacity>
@@ -156,7 +158,7 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: colors.awsDark },
   backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   backBtnText: { color: '#fff', fontSize: 20, fontWeight: '700', lineHeight: 22 },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: colors.textLight },
+  headerTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '800', color: colors.textLight },
   scroll: { flex: 1, backgroundColor: colors.background },
   scrollContent: { padding: 16 },
   introCard: { flexDirection: 'row', backgroundColor: colors.optionSelected, borderRadius: 14, padding: 16, marginBottom: 20, gap: 14, borderWidth: 1, borderColor: colors.optionSelectedBorder, alignItems: 'flex-start' },

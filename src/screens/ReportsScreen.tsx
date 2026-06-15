@@ -17,6 +17,7 @@ import { getQuestionReports, deleteQuestionReport, QuestionReport } from '../uti
 import { formatDate } from '../utils/dateUtils';
 import { useTheme } from '../contexts/ThemeContext';
 import { ColorScheme } from '../constants/colors';
+import { SHARED_STYLES } from '../utils/styleUtils';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Reports'>;
 
@@ -37,6 +38,7 @@ const CATEGORY_COLOR: Record<QuestionReport['category'], string> = {
 export default function ReportsScreen({ navigation }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const shared = useMemo(() => SHARED_STYLES(colors), [colors]);
   const [reports, setReports] = useState<QuestionReport[]>([]);
 
   useFocusEffect(
@@ -87,7 +89,7 @@ export default function ReportsScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={shared.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Text style={styles.backBtnText}>←</Text>
         </TouchableOpacity>
@@ -194,7 +196,7 @@ const makeStyles = (colors: ColorScheme) =>
       justifyContent: 'center',
     },
     backBtnText: { color: '#fff', fontSize: 20, fontWeight: '700', lineHeight: 22 },
-    headerTitle: { fontSize: 18, fontWeight: '800', color: colors.textLight },
+    headerTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '800', color: colors.textLight },
     exportBtn: {
       paddingHorizontal: 12,
       paddingVertical: 6,

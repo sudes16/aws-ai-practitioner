@@ -36,6 +36,7 @@ import { resetSRData, getSRRecordCount } from '../utils/spacedRepetition';
 import { getAiKey, saveAiKey } from '../utils/aiService';
 import { useTheme } from '../contexts/ThemeContext';
 import { ColorScheme } from '../constants/colors';
+import { SHARED_STYLES } from '../utils/styleUtils';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
@@ -46,6 +47,7 @@ const AI_STUDIO_URL = 'https://aistudio.google.com/';
 export default function SettingsScreen({ navigation }: Props) {
   const { colors, themeMode, setThemeMode } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const shared = useMemo(() => SHARED_STYLES(colors), [colors]);
 
   const scrollRef = useRef<ScrollView>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -264,7 +266,7 @@ export default function SettingsScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={shared.header}>
         <Text style={styles.headerTitle}>⚙️ Settings</Text>
       </View>
 
@@ -721,13 +723,6 @@ export default function SettingsScreen({ navigation }: Props) {
 const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.awsDark },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: colors.awsDark,
-  },
   headerTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '800', color: colors.textLight },
 
   scroll: { flex: 1, backgroundColor: colors.background },
