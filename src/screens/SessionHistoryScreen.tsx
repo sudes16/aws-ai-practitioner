@@ -218,7 +218,7 @@ export default function SessionHistoryScreen({ navigation }: Props) {
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
       {/* Header */}
       <View style={shared.header}>
-        <Text style={styles.headerTitle}>�️ History</Text>
+        <Text style={styles.headerTitle}>🕒 History</Text>
       </View>
 
       {/* Tabs */}
