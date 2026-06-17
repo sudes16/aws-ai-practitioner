@@ -1,7 +1,8 @@
 # Google Play Store Submission Guide
 
 > **App:** AWS AI Practitioner Prep (`com.awsquiz.aifpractitioner`)
-> **Last updated:** May 31, 2026 (Sync with Gold Build)
+> **Technical Name:** `aws-ai-practitioner-prep`
+> **Last updated:** June 15, 2026 (Sync with Gold Build)
 
 This is a self-contained checklist for uploading this app to Google Play Console.
 Every question Play Console will ask you, with the exact answer that matches the
