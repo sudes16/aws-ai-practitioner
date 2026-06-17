@@ -51,17 +51,21 @@ export default function ReviewScreen({ navigation, route }: Props) {
   // Refs for internal lists to reset position
   const listRefs = useRef<Record<string, FlatList | null>>({});
 
-  // Sync header tabs when filter changes (due to swipe or tap)
+  // Sync header tabs when filter changes (due to swipe or tap).
+  // Uses a manually-clamped offset so the first/last tab is never clipped.
   useEffect(() => {
     const idx = FILTERS.findIndex(f => f.key === filter);
-    if (idx !== -1) {
-      filterListRef.current?.scrollToIndex({
-        index: idx,
-        animated: true,
-        viewPosition: 0.5,
-      });
-    }
-  }, [filter]);
+    if (idx === -1) return;
+    const TAB_WIDTH = 100;
+    const GAP = 8;
+    const PAD = 16;
+    const tabCenter = PAD + idx * (TAB_WIDTH + GAP) + TAB_WIDTH / 2;
+    const contentWidth = PAD * 2 + FILTERS.length * TAB_WIDTH + (FILTERS.length - 1) * GAP;
+    const maxOffset = Math.max(0, contentWidth - screenWidth);
+    const desired = tabCenter - screenWidth / 2;
+    const clamped = Math.max(0, Math.min(desired, maxOffset));
+    filterListRef.current?.scrollToOffset({ offset: clamped, animated: true });
+  }, [filter, screenWidth]);
 
   const getItemLayout = (_: any, index: number) => ({
     length: 100, // Matching the style width

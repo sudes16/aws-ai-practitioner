@@ -60,26 +60,7 @@ export default function SessionHistoryScreen({ navigation }: Props) {
   const { notesMap }                       = useNotes();
 
   const flatListRef = useRef<FlatList>(null);
-  const tabListRef = useRef<FlatList>(null);
   const isInternalScroll = useRef(false);
-
-  // Sync header tabs when activeTab changes (due to swipe or tap)
-  useEffect(() => {
-    const idx = TABS.findIndex(t => t.key === activeTab);
-    if (idx !== -1) {
-      tabListRef.current?.scrollToIndex({
-        index: idx,
-        animated: true,
-        viewPosition: 0.5,
-      });
-    }
-  }, [activeTab]);
-
-  const getItemLayout = (_: any, index: number) => ({
-    length: 110, // Matching the style width
-    offset: (110 + 8) * index, // length + gap
-    index,
-  });
 
   // Refs for internal scroll views to reset position
   const scrollRefs = useRef<Record<string, ScrollView | null>>({});
@@ -242,22 +223,15 @@ export default function SessionHistoryScreen({ navigation }: Props) {
 
       {/* Tabs */}
       <View style={styles.tabBar}>
-        <FlatList
-          ref={tabListRef}
-          data={TABS}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={t => t.key}
-          contentContainerStyle={styles.tabListContent}
-          getItemLayout={getItemLayout}
-          initialNumToRender={3}
-          renderItem={({ item: tab }) => {
+        <View style={styles.tabRow}>
+          {TABS.map(tab => {
             const count =
               tab.key === 'all'  ? scoreHistory.filter(s => resolveAnswered(s) > 0).length
               : tab.key === 'exam' ? scoreHistory.filter(s => s.mode === 'exam' && resolveAnswered(s) > 0).length
               : scoreHistory.filter(s => s.mode !== 'exam' && resolveAnswered(s) > 0).length;
             return (
               <TouchableOpacity
+                key={tab.key}
                 style={[styles.tab, activeTab === tab.key && styles.tabActive]}
                 onPress={() => scrollToTab(tab.key)}
                 accessibilityRole="tab"
@@ -272,11 +246,8 @@ export default function SessionHistoryScreen({ navigation }: Props) {
                 )}
               </TouchableOpacity>
             );
-          }}
-          onScrollToIndexFailed={info => {
-            tabListRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true });
-          }}
-        />
+          })}
+        </View>
       </View>
 
       <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -318,7 +289,9 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     backgroundColor: colors.awsDark,
     paddingBottom: 10,
   },
-  tabListContent: {
+  tabRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
     paddingHorizontal: 16,
     gap: 8,
   },
