@@ -43,8 +43,6 @@
       },
       "package": "com.awsquiz.aifpractitioner",
       "versionCode": 7,
-      "targetSdkVersion": 35,
-      "compileSdkVersion": 35,
       "permissions": [
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",
