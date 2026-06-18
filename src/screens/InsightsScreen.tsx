@@ -219,6 +219,24 @@ export default function InsightsScreen({ navigation }: Props) {
       return count;
     })();
 
+    const bestStreak = (() => {
+      if (scoreHistory.length === 0) return 0;
+      const days = [...new Set(scoreHistory.map(s => s.date.slice(0, 10)))].sort();
+      let best = 1;
+      let run = 1;
+      for (let i = 1; i < days.length; i++) {
+        const prev = new Date(days[i - 1]).getTime();
+        const curr = new Date(days[i]).getTime();
+        if (curr - prev === 86_400_000) {
+          run++;
+          if (run > best) best = run;
+        } else {
+          run = 1;
+        }
+      }
+      return best;
+    })();
+
     const histCounts = HIST_BUCKETS.map(b => ({
       ...b,
       count: filteredHistory.filter(s => s.pct >= b.min && s.pct <= b.max).length,
@@ -309,6 +327,11 @@ export default function InsightsScreen({ navigation }: Props) {
               <View style={styles.summaryCard}>
                 <Text style={styles.summaryValue}>{streak > 0 ? `🔥 ${streak}` : '—'}</Text>
                 <Text style={styles.summaryLabel}>Streak</Text>
+                {bestStreak > 0 && (
+                  <Text style={[styles.summarySubLabel, { color: colors.textMuted }]}>
+                    Best: {bestStreak}
+                  </Text>
+                )}
               </View>
               <View style={styles.summaryCard}>
                 <Text style={styles.summaryValue}>{completionRate}%</Text>
