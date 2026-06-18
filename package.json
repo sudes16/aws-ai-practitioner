@@ -50,11 +50,6 @@
           "@google/generative-ai"
         ]
       }
-    },
-    "install": {
-      "exclude": [
-        "expo-build-properties"
-      ]
     }
   },
   "private": true
