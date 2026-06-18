@@ -106,7 +106,7 @@ export const deleteQuestionReport = async (timestamp: string): Promise<void> => 
 // ── Score History ──────────────────────────────────────────────────────────
 
 const SCORE_HISTORY_KEY = 'quiz_score_history';
-const MAX_SCORE_HISTORY = 100;
+const MAX_SCORE_HISTORY = 365;
 
 export interface ScoreSession {
   date: string;
