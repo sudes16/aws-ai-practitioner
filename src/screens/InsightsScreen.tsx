@@ -622,7 +622,7 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 12, paddingHorizontal: 4 },
   metaText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
   readinessHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 },
-  readinessScore: { fontSize: 32, fontWeight: '900' },
+  readinessScore: { fontSize: 20, fontWeight: '800' },
   readinessLabel: { fontSize: 13, fontWeight: '700' },
   readinessHint: { fontSize: 11, color: colors.textMuted, marginTop: 8 },
   noDataHint: { textAlign: 'center', padding: 20, color: colors.textMuted, fontSize: 13 },
