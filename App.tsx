@@ -16,20 +16,22 @@ export default function App() {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
+    const MIN_STAGE2_MS = 900; // ensure the tagline UI is readable
+    const startedAt = Date.now();
+
     async function loadData() {
       try {
-        // Load local questions
         await loadCachedOtaQuestions();
-        // Background fetch for fresh ones
         fetchRemoteQuestions().catch(() => {});
       } catch (e) {
         console.warn('Load Error:', e);
       } finally {
-        // Wait a tiny bit extra for smooth transition
-        setTimeout(() => {
-          setIsReady(true);
-          SplashScreen.hideAsync().catch(() => {});
-        }, 500);
+        // Reveal the Stage 2 UI immediately by hiding the native splash,
+        // then wait so the logo + tagline are visible for at least MIN_STAGE2_MS.
+        SplashScreen.hideAsync().catch(() => {});
+        const elapsed = Date.now() - startedAt;
+        const remaining = Math.max(0, MIN_STAGE2_MS - elapsed);
+        setTimeout(() => setIsReady(true), remaining);
       }
     }
 
