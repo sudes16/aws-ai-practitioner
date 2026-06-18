@@ -171,13 +171,13 @@ export default function InsightsScreen({ navigation }: Props) {
         ? withAnswers.filter(s => s.mode === 'exam')
         : withAnswers.filter(s => s.mode !== 'exam');
 
-    // Abandoned: any session in the current tab scope that has 0 answered questions.
+    // Abandoned: any session the user did not complete (quit at any point).
     const scopedFull = tabKey === 'all'
       ? scoreHistory
       : tabKey === 'exam'
         ? scoreHistory.filter(s => s.mode === 'exam')
         : scoreHistory.filter(s => s.mode !== 'exam');
-    const abandonedCount = scopedFull.filter(s => resolveAnswered(s) === 0).length;
+    const abandonedCount = scopedFull.filter(s => s.quit).length;
     const lastSessionISO = scopedFull[0]?.date;
 
     const totalSessions = filteredHistory.length;

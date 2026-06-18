@@ -90,7 +90,9 @@ export default function ResultScreen({ navigation, route }: Props) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const answered     = history.length;
-  const pct          = answered > 0 ? (score / answered) * 100 : 0;
+  const pct          = quit
+    ? (total > 0 ? (score / total) * 100 : 0)
+    : (answered > 0 ? (score / answered) * 100 : 0);
   const pass         = pct >= PASS_THRESHOLD_PCT;
   const correct      = history.filter(h => h.correct === true).length;
   const incorrect    = history.filter(h => h.correct === false).length;
