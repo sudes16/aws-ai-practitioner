@@ -325,13 +325,12 @@ export default function InsightsScreen({ navigation }: Props) {
                 <Text style={styles.summaryLabel}>Pass Rate</Text>
               </View>
               <View style={styles.summaryCard}>
-                <Text style={styles.summaryValue}>{streak > 0 ? `🔥 ${streak}` : '—'}</Text>
-                <Text style={styles.summaryLabel}>Streak</Text>
-                {bestStreak > 0 && (
-                  <Text style={[styles.summarySubLabel, { color: colors.textMuted }]}>
-                    Best: {bestStreak}
-                  </Text>
-                )}
+                <Text style={styles.summaryValue}>
+                  {streak > 0 || bestStreak > 0
+                    ? `🔥 ${streak} / ${bestStreak}`
+                    : '—'}
+                </Text>
+                <Text style={styles.summaryLabel}>Streak / Best</Text>
               </View>
               <View style={styles.summaryCard}>
                 <Text style={styles.summaryValue}>{completionRate}%</Text>
