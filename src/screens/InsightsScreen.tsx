@@ -341,7 +341,7 @@ export default function InsightsScreen({ navigation }: Props) {
             {(abandonedCount > 0 || lastSessionISO) && (
               <View style={styles.metaRow}>
                 {abandonedCount > 0 && (
-                  <Text style={styles.metaText}>📌 {abandonedCount} abandoned</Text>
+                  <Text style={styles.metaText}>📌 {abandonedCount} of {scopedFull.length} sessions abandoned</Text>
                 )}
                 {lastSessionISO && (
                   <Text style={styles.metaText}>⏱ Last session: {relativeDay(lastSessionISO)}</Text>
