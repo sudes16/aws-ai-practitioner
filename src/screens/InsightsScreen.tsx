@@ -50,6 +50,29 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'exam',     label: 'Exam' },
 ];
 
+/** Derive how many questions were actually answered (handles legacy data). */
+function resolveAnswered(s: ScoreSession): number {
+  if (s.answeredCount !== undefined) return s.answeredCount;
+  if (s.quit) {
+    if (s.pct > 0) return Math.round(s.score / s.pct * 100);
+    return 0;
+  }
+  return s.questionCount;
+}
+
+/** Human-readable "x days ago" / "today" / "yesterday" for the last session line. */
+function relativeDay(iso: string): string {
+  const then = new Date(iso);
+  const now = new Date();
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diffDays = Math.round((startOfDay(now) - startOfDay(then)) / 86_400_000);
+  if (diffDays <= 0) return 'today';
+  if (diffDays === 1) return 'yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+  return `${Math.floor(diffDays / 30)}mo ago`;
+}
+
 // Module-level cache: survives tab switches; invalidated via getInsightsDataVersion().
 type InsightsCache = {
   version: number;
@@ -141,11 +164,21 @@ export default function InsightsScreen({ navigation }: Props) {
   const renderPage = ({ item }: { item: TabKey }) => {
     const tabKey = item;
     // Calculate data independently per page
+    const withAnswers = scoreHistory.filter(s => resolveAnswered(s) > 0);
     const filteredHistory = tabKey === 'all'
+      ? withAnswers
+      : tabKey === 'exam'
+        ? withAnswers.filter(s => s.mode === 'exam')
+        : withAnswers.filter(s => s.mode !== 'exam');
+
+    // Abandoned: any session in the current tab scope that has 0 answered questions.
+    const scopedFull = tabKey === 'all'
       ? scoreHistory
       : tabKey === 'exam'
         ? scoreHistory.filter(s => s.mode === 'exam')
         : scoreHistory.filter(s => s.mode !== 'exam');
+    const abandonedCount = scopedFull.filter(s => resolveAnswered(s) === 0).length;
+    const lastSessionISO = scopedFull[0]?.date;
 
     const totalSessions = filteredHistory.length;
     const avgScore = totalSessions === 0 ? 0 : Math.round(filteredHistory.reduce((s, h) => s + h.pct, 0) / totalSessions);
@@ -214,6 +247,24 @@ export default function InsightsScreen({ navigation }: Props) {
     })();
     const coveragePct = totalQCount > 0 ? Math.round((uniqueQsSeen / totalQCount) * 100) : 0;
 
+    // Exam readiness: weighted composite of pass rate, recent avg, and coverage.
+    // 50% pass rate + 30% avg of last 3 + 20% coverage. Capped at 100.
+    const recentAvg = (() => {
+      const last3 = filteredHistory.slice(0, 3);
+      if (last3.length === 0) return 0;
+      return Math.round(last3.reduce((s, h) => s + h.pct, 0) / last3.length);
+    })();
+    const readinessScore = totalSessions > 0
+      ? Math.min(100, Math.round(passRate * 0.5 + recentAvg * 0.3 + coveragePct * 0.2))
+      : 0;
+    const readinessColor = readinessScore >= 70 ? colors.correct
+      : readinessScore >= 50 ? colors.awsOrange
+      : colors.wrong;
+    const readinessLabel = readinessScore >= 80 ? 'Exam-ready'
+      : readinessScore >= 60 ? 'Almost there'
+      : readinessScore >= 40 ? 'Keep practicing'
+      : 'Just getting started';
+
     return (
       <ScrollView
         ref={r => { scrollRefs.current[tabKey] = r; }}
@@ -263,6 +314,31 @@ export default function InsightsScreen({ navigation }: Props) {
                 <Text style={styles.summaryValue}>{completionRate}%</Text>
                 <Text style={styles.summaryLabel}>Completed</Text>
               </View>
+            </View>
+
+            {(abandonedCount > 0 || lastSessionISO) && (
+              <View style={styles.metaRow}>
+                {abandonedCount > 0 && (
+                  <Text style={styles.metaText}>📌 {abandonedCount} abandoned</Text>
+                )}
+                {lastSessionISO && (
+                  <Text style={styles.metaText}>⏱ Last session: {relativeDay(lastSessionISO)}</Text>
+                )}
+              </View>
+            )}
+
+            <Text style={shared.sectionLabel}>EXAM READINESS</Text>
+            <View style={shared.card}>
+              <View style={styles.readinessHeader}>
+                <Text style={[styles.readinessScore, { color: readinessColor }]}>{readinessScore}%</Text>
+                <Text style={[styles.readinessLabel, { color: readinessColor }]}>{readinessLabel}</Text>
+              </View>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${readinessScore}%` as any, backgroundColor: readinessColor }]} />
+              </View>
+              <Text style={styles.readinessHint}>
+                Based on pass rate, recent scores, and question coverage.
+              </Text>
             </View>
 
             <Text style={shared.sectionLabel}>SCORE TREND (LAST {trendSessions.length})</Text>
@@ -390,17 +466,30 @@ export default function InsightsScreen({ navigation }: Props) {
 
       <View style={styles.tabBar}>
         <View style={styles.tabRow}>
-          {TABS.map(tab => (
-            <TouchableOpacity
-              key={tab.key}
-              style={[styles.tab, activeTab === tab.key && styles.tabActive]}
-              onPress={() => scrollToTab(tab.key)}
-            >
-              <Text style={[styles.tabLabel, activeTab === tab.key && styles.tabLabelActive]}>
-                {tab.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {TABS.map(tab => {
+            const scope = tab.key === 'all'
+              ? scoreHistory
+              : tab.key === 'exam'
+                ? scoreHistory.filter(s => s.mode === 'exam')
+                : scoreHistory.filter(s => s.mode !== 'exam');
+            const count = scope.filter(s => resolveAnswered(s) > 0).length;
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                style={[styles.tab, activeTab === tab.key && styles.tabActive]}
+                onPress={() => scrollToTab(tab.key)}
+              >
+                <Text style={[styles.tabLabel, activeTab === tab.key && styles.tabLabelActive]}>
+                  {tab.label}
+                </Text>
+                {count > 0 && (
+                  <Text style={[styles.tabCount, activeTab === tab.key && styles.tabCountActive]}>
+                    {count}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
 
@@ -483,7 +572,7 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: '800', color: colors.textLight, textAlign: 'center', flex: 1 },
   tabBar: { backgroundColor: colors.awsDark, paddingBottom: 10 },
   tabRow: { flexDirection: 'row', justifyContent: 'center', paddingHorizontal: 16, gap: 8 },
-  tab: { width: 110, paddingVertical: 8, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center' },
+  tab: { width: 110, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.08)' },
   tabActive: { backgroundColor: colors.awsOrange },
   tabLabel: { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.6)' },
   tabLabelActive: { color: '#fff' },
@@ -498,6 +587,22 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   summaryValue: { fontSize: 20, fontWeight: '800', color: colors.textPrimary },
   summaryLabel: { fontSize: 10, fontWeight: '600', color: colors.textSecondary, marginTop: 2 },
   summarySubLabel: { fontSize: 9, fontWeight: '700', marginTop: 1 },
+  tabCount: {
+    fontSize: 11, fontWeight: '600',
+    color: 'rgba(255,255,255,0.45)',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1,
+  },
+  tabCountActive: {
+    color: 'rgba(255,255,255,0.85)',
+    backgroundColor: 'rgba(0,0,0,0.15)',
+  },
+  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 12, paddingHorizontal: 4 },
+  metaText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  readinessHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 },
+  readinessScore: { fontSize: 32, fontWeight: '900' },
+  readinessLabel: { fontSize: 13, fontWeight: '700' },
+  readinessHint: { fontSize: 11, color: colors.textMuted, marginTop: 8 },
   noDataHint: { textAlign: 'center', padding: 20, color: colors.textMuted, fontSize: 13 },
   histRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   histLabel: { width: 50, fontSize: 11, color: colors.textSecondary, fontWeight: '600' },
