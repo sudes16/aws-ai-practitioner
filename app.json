@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "AWS AI Practitioner Prep",
-    "slug": "aws-ai-practitioner-prep",
+    "slug": "aws-ai-practitioner-quiz",
     "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
