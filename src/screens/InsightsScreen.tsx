@@ -361,6 +361,9 @@ export default function InsightsScreen({ navigation }: Props) {
               <Text style={styles.readinessHint}>
                 Based on pass rate, recent scores, and question coverage.
               </Text>
+              <Text style={styles.readinessHint}>
+                Calculated from {totalSessions} {totalSessions === 1 ? 'session' : 'sessions'}.
+              </Text>
             </View>
 
             <Text style={shared.sectionLabel}>SCORE TREND (LAST {trendSessions.length})</Text>
