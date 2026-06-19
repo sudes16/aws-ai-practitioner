@@ -22,15 +22,20 @@ import { useNotes } from '../contexts/NotesContext';
 import ExplanationModal from '../components/ExplanationModal';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Review'>;
-type Filter = 'all' | 'correct' | 'wrong' | 'flagged' | 'noted';
+type Filter = 'all' | 'correct' | 'wrong' | 'unanswered' | 'flagged' | 'noted';
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'correct', label: '✓ Correct' },
   { key: 'wrong', label: '✗ Wrong' },
+  { key: 'unanswered', label: '○ Unanswered' },
   { key: 'flagged', label: '🚩 Flagged' },
   { key: 'noted', label: '✎ Noted' },
 ];
+
+const TAB_WIDTH = 130;
+const TAB_GAP = 8;
+const TAB_PAD = 16;
 
 export default function ReviewScreen({ navigation, route }: Props) {
   const { history, initialFilter, date, mode, total, pct, quit } = route.params;
@@ -48,6 +53,20 @@ export default function ReviewScreen({ navigation, route }: Props) {
   const filterListRef = useRef<FlatList>(null);
   const isInternalScroll = useRef(false);
 
+  // Per-filter counts shown as badges in each tab label.
+  const counts: Record<Filter, number> = useMemo(() => ({
+    all: history.length,
+    correct: history.filter(h => h.correct === true).length,
+    wrong: history.filter(h => h.correct === false).length,
+    unanswered: history.filter(h => h.correct === null && !h.isHotspot).length,
+    flagged: history.filter(h => h.flagged).length,
+    noted: history.filter(h => !!notesMap[h.questionNumber]).length,
+  }), [history, notesMap]);
+  const answeredCount = useMemo(
+    () => history.filter(h => h.userLetters.length > 0).length,
+    [history],
+  );
+
   // Refs for internal lists to reset position
   const listRefs = useRef<Record<string, FlatList | null>>({});
 
@@ -56,11 +75,8 @@ export default function ReviewScreen({ navigation, route }: Props) {
   useEffect(() => {
     const idx = FILTERS.findIndex(f => f.key === filter);
     if (idx === -1) return;
-    const TAB_WIDTH = 100;
-    const GAP = 8;
-    const PAD = 16;
-    const tabCenter = PAD + idx * (TAB_WIDTH + GAP) + TAB_WIDTH / 2;
-    const contentWidth = PAD * 2 + FILTERS.length * TAB_WIDTH + (FILTERS.length - 1) * GAP;
+    const tabCenter = TAB_PAD + idx * (TAB_WIDTH + TAB_GAP) + TAB_WIDTH / 2;
+    const contentWidth = TAB_PAD * 2 + FILTERS.length * TAB_WIDTH + (FILTERS.length - 1) * TAB_GAP;
     const maxOffset = Math.max(0, contentWidth - screenWidth);
     const desired = tabCenter - screenWidth / 2;
     const clamped = Math.max(0, Math.min(desired, maxOffset));
@@ -68,8 +84,8 @@ export default function ReviewScreen({ navigation, route }: Props) {
   }, [filter, screenWidth]);
 
   const getItemLayout = (_: any, index: number) => ({
-    length: 100, // Matching the style width
-    offset: (100 + 8) * index, // length + gap
+    length: TAB_WIDTH,
+    offset: (TAB_WIDTH + TAB_GAP) * index,
     index,
   });
 
@@ -142,14 +158,32 @@ export default function ReviewScreen({ navigation, route }: Props) {
     const q = questions[item.questionIndex];
     if (!q) return null;
 
+    const isUnanswered = !item.isHotspot && item.correct === null;
+
     const statusColor =
       item.isHotspot
         ? colors.awsOrange
+        : isUnanswered
+        ? colors.textMuted
         : item.correct === true
         ? colors.correct
         : colors.wrong;
 
-    const statusIcon = item.isHotspot ? '⚡' : item.correct ? '✓' : '✗';
+    const statusIcon = item.isHotspot
+      ? '⚡'
+      : isUnanswered
+      ? '○'
+      : item.correct
+      ? '✓'
+      : '✗';
+
+    const statusLabel = item.isHotspot
+      ? 'Hotspot'
+      : isUnanswered
+      ? 'Unanswered'
+      : item.correct
+      ? 'Correct'
+      : 'Wrong';
 
     return (
       <TouchableOpacity
@@ -164,12 +198,7 @@ export default function ReviewScreen({ navigation, route }: Props) {
             <Text style={styles.cardQNum}>Q {q.number}</Text>
             <View style={[styles.statusBadge, { backgroundColor: statusColor + '22' }]}>
               <Text style={[styles.statusBadgeText, { color: statusColor }]}>
-                {statusIcon}{' '}
-                {item.isHotspot
-                  ? 'Hotspot'
-                  : item.correct
-                  ? 'Correct'
-                  : 'Wrong'}
+                {statusIcon} {statusLabel}
               </Text>
             </View>
             {item.flagged && <Text style={styles.flaggedIcon}>🚩</Text>}
@@ -186,7 +215,7 @@ export default function ReviewScreen({ navigation, route }: Props) {
                 <Text
                   style={[
                     styles.answerValue,
-                    { color: item.correct === true ? colors.correct : colors.wrong },
+                    { color: item.correct === true ? colors.correct : isUnanswered ? colors.textMuted : colors.wrong },
                   ]}
                 >
                   {item.userLetters.length > 0
@@ -225,6 +254,7 @@ export default function ReviewScreen({ navigation, route }: Props) {
       if (filterKey === 'all') return true;
       if (filterKey === 'correct') return entry.correct === true;
       if (filterKey === 'wrong') return entry.correct === false;
+      if (filterKey === 'unanswered') return entry.correct === null && !entry.isHotspot;
       if (filterKey === 'flagged') return entry.flagged;
       if (filterKey === 'noted') return !!notesMap[entry.questionNumber];
       return true;
@@ -270,7 +300,7 @@ export default function ReviewScreen({ navigation, route }: Props) {
             </Text>
           )}
         </View>
-        <Text style={styles.headerSub}>{history.length} answered</Text>
+        <Text style={styles.headerSub}>{answeredCount} of {history.length} answered</Text>
       </View>
 
       <View style={styles.filterWrap}>
@@ -297,7 +327,7 @@ export default function ReviewScreen({ navigation, route }: Props) {
                   filter === f.key && styles.filterTabTextActive,
                 ]}
               >
-                {f.label}
+                {f.label} ({counts[f.key]})
               </Text>
             </TouchableOpacity>
           )}
@@ -414,7 +444,7 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     gap: 8,
   },
   filterTab: {
-    width: 100, // Fixed width for reliable centering
+    width: 130, // Fixed width for reliable centering (accommodates labels + count badge)
     paddingVertical: 7,
     borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.1)',

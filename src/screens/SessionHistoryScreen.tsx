@@ -166,8 +166,7 @@ export default function SessionHistoryScreen({ navigation }: Props) {
                 const record = filteredRecords.find(r =>
                   Math.abs(new Date(r.date).getTime() - new Date(s.date).getTime()) < 5000,
                 );
-                const answered = resolveAnswered(s);
-                const answeredLabel = `${s.score}/${answered}`;
+                const answeredLabel = `${s.score}/${s.questionCount}`;
 
                 return (
                   <View key={i}>

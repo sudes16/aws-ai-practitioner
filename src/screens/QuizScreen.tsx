@@ -18,9 +18,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { RootStackParamList, HistoryEntry, Question, OptionState } from '../constants/types';
-import { getAllQuestions, parseCorrectLetters } from '../utils/quizEngine';
+import { getAllQuestions, parseCorrectLetters, getDomainForIndex } from '../utils/quizEngine';
 import { setExamResult } from '../utils/examResultStore';
-import { addQuestionReport, QuestionReport } from '../utils/storage';
+import {
+  addQuestionReport,
+  QuestionReport,
+  saveSessionRecord,
+  addScoreSession,
+  addMasteredQuestions,
+  removeMasteredQuestions,
+} from '../utils/storage';
 import { updateSRRecord } from '../utils/spacedRepetition';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../contexts/ThemeContext';
@@ -98,6 +105,7 @@ export default function QuizScreen({ navigation, route }: Props) {
   const [showExamReview, setShowExamReview] = useState(false);
   const [examReviewFilters, setExamReviewFilters] = useState<Set<string>>(new Set());
   const [showExamConfirm, setShowExamConfirm] = useState(false);
+  const [showExamQuitConfirm, setShowExamQuitConfirm] = useState(false);
   const [showSkipConfirm, setShowSkipConfirm] = useState(false);
   const [examWarning, setExamWarning] = useState<string | null>(null);
   const examWarningFiredRef = useRef<Set<number>>(new Set());
@@ -288,7 +296,7 @@ export default function QuizScreen({ navigation, route }: Props) {
               ? correctLettersList.length === userLetters.length &&
                 userLetters.every(l => correctLettersList.includes(l))
               : userLetters[0] === correctLettersList[0]
-            : false;
+            : userLetters.length > 0 ? false : null;
         h.push({
           questionNumber: q.number,
           questionIndex: qIdx,
@@ -311,6 +319,84 @@ export default function QuizScreen({ navigation, route }: Props) {
   };
   const submitExamRef = useRef(submitExam);
   submitExamRef.current = submitExam;
+
+  // Save the exam as an abandoned attempt (quit: true). Mirrors submitExam's grading
+  // pass, but persists directly via storage and skips ExamResultScreen's celebration.
+  const quitExam = async () => {
+    try {
+      const h: HistoryEntry[] = [];
+      for (let i = 0; i < totalQuestions; i++) {
+        const qIdx = config.indices[i];
+        const q = questions[qIdx];
+        if (!q) continue;
+        const userLetters = examDraftAnswers[i] ?? [];
+        const correctLettersList = q.answer ? parseCorrectLetters(q.answer, q.is_multi) : [];
+        const isCorrect: boolean | null = q.is_hotspot
+          ? null
+          : userLetters.length > 0 && correctLettersList.length > 0
+            ? q.is_multi
+              ? correctLettersList.length === userLetters.length &&
+                userLetters.every(l => correctLettersList.includes(l))
+              : userLetters[0] === correctLettersList[0]
+            : userLetters.length > 0 ? false : null;
+        h.push({
+          questionNumber: q.number,
+          questionIndex: qIdx,
+          userLetters,
+          correctLetters: correctLettersList,
+          correct: isCorrect,
+          isHotspot: q.is_hotspot,
+          flagged: flagged.has(q.number),
+        });
+      }
+      const score = h.filter(x => x.correct === true).length;
+      const answeredCount = h.filter(x => x.correct !== null).length;
+      const pct = totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0;
+
+      const domainBreakdown: Record<number, { c: number; t: number }> = {};
+      h.forEach(entry => {
+        if (entry.correct !== null) {
+          const d = getDomainForIndex(entry.questionIndex);
+          if (!domainBreakdown[d]) domainBreakdown[d] = { c: 0, t: 0 };
+          domainBreakdown[d].t++;
+          if (entry.correct) domainBreakdown[d].c++;
+        }
+      });
+
+      const correctNums = h.filter(x => x.correct === true).map(x => x.questionNumber);
+      const wrongNums = h.filter(x => x.correct === false).map(x => x.questionNumber);
+      if (correctNums.length > 0) await addMasteredQuestions(correctNums);
+      if (wrongNums.length > 0) await removeMasteredQuestions(wrongNums);
+
+      const nowISO = new Date().toISOString();
+      await saveSessionRecord({
+        id: nowISO,
+        date: nowISO,
+        mode: 'exam',
+        questionCount: totalQuestions,
+        score,
+        pct,
+        quit: true,
+        elapsedSeconds: EXAM_TOTAL - examTimeLeftRef.current,
+        history: h,
+      });
+      await addScoreSession({
+        date: nowISO,
+        mode: 'exam',
+        domain: 0,
+        questionCount: totalQuestions,
+        answeredCount,
+        score,
+        pct,
+        quit: true,
+        domainBreakdown,
+      });
+
+      navigation.popToTop();
+    } catch (err) {
+      Alert.alert('Save Error', String(err));
+    }
+  };
 
   useEffect(() => {
     if (!config.timed || timeLeft === null || submitted || isReviewingPast) return;
@@ -1260,10 +1346,16 @@ export default function QuizScreen({ navigation, route }: Props) {
                 <Text style={styles.modalBtnSecText}>Back</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnDanger]}
+                onPress={() => setShowExamQuitConfirm(true)}
+              >
+                <Text style={styles.modalBtnDangerText}>Save & Quit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={[styles.modalBtn, styles.examSubmitBtn]}
                 onPress={() => setShowExamConfirm(true)}
               >
-                <Text style={styles.examSubmitBtnText}>End Exam</Text>
+                <Text style={styles.examSubmitBtnText}>Submit Exam</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1346,6 +1438,42 @@ export default function QuizScreen({ navigation, route }: Props) {
                 }}
               >
                 <Text style={styles.modalBtnDangerText}>Skip</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Save & Quit (Exam) Confirmation Modal ── */}
+      <Modal
+        visible={showExamQuitConfirm}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowExamQuitConfirm(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Save & Quit?</Text>
+            <Text style={styles.modalBody}>
+              This attempt will be saved as abandoned.
+              {'\n'}It won't count toward your pass rate or readiness score.
+            </Text>
+            <View style={styles.modalBtns}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnSecondary]}
+                onPress={() => setShowExamQuitConfirm(false)}
+              >
+                <Text style={styles.modalBtnSecText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnDanger]}
+                onPress={() => {
+                  setShowExamQuitConfirm(false);
+                  setShowExamReview(false);
+                  quitExam();
+                }}
+              >
+                <Text style={styles.modalBtnDangerText}>Save & Quit</Text>
               </TouchableOpacity>
             </View>
           </View>
