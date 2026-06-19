@@ -322,8 +322,16 @@ export default function QuizScreen({ navigation, route }: Props) {
 
   // Save the exam as an abandoned attempt (quit: true). Mirrors submitExam's grading
   // pass, but persists directly via storage and skips ExamResultScreen's celebration.
+  // Zero-answer quits are treated as no-ops (no session is stored) so phantom rows
+  // never pollute History or Insights metrics.
   const quitExam = async () => {
     try {
+      // Bail before doing any work if the user never answered anything.
+      if (!Object.values(examDraftAnswers).some(a => a.length > 0)) {
+        navigation.popToTop();
+        return;
+      }
+
       const h: HistoryEntry[] = [];
       for (let i = 0; i < totalQuestions; i++) {
         const qIdx = config.indices[i];
@@ -349,6 +357,7 @@ export default function QuizScreen({ navigation, route }: Props) {
           flagged: flagged.has(q.number),
         });
       }
+
       const score = h.filter(x => x.correct === true).length;
       const answeredCount = h.filter(x => x.correct !== null).length;
       const pct = totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0;
@@ -668,6 +677,12 @@ export default function QuizScreen({ navigation, route }: Props) {
 
   const finishQuiz = (quit: boolean) => {
     const h = historyRef.current;
+    // Zero-answer quits are no-ops: skip the Result screen and don't persist anything,
+    // so abandoning before answering anything doesn't create a phantom session.
+    if (quit && h.length === 0) {
+      navigation.popToTop();
+      return;
+    }
     navigation.replace('Result', {
       history: h,
       total: totalQuestions,

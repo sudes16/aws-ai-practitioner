@@ -188,8 +188,8 @@ export default function SettingsScreen({ navigation }: Props) {
   const handleResetExamHistory = () => {
     if (examSeenCount === 0) return;
     confirmAction(
-      'Reset Exam History',
-      `This will clear the record of ${examSeenCount} seen questions so the next exam picks from the full bank again. Continue?`,
+      'Reset Exam Rotation',
+      `This will clear the record of ${examSeenCount} used questions so the next exam picks from the full bank again. Continue?`,
       'Reset',
       async () => { await resetExamHistory(); setExamSeenCount(0); },
     );
@@ -597,9 +597,9 @@ export default function SettingsScreen({ navigation }: Props) {
           <View style={styles.row}>
             <Text style={styles.rowIcon}>🎓</Text>
             <View style={{ flex: 1 }}>
-              <Text style={styles.rowLabel}>Exam question history</Text>
+              <Text style={styles.rowLabel}>Exam rotation</Text>
               <Text style={styles.rowSub}>
-                {examSeenCount} of {totalQuestions} questions seen
+                {examSeenCount} of {totalQuestions} used — fresh exams prefer unused questions
               </Text>
             </View>
             <TouchableOpacity

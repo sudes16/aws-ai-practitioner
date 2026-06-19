@@ -258,9 +258,13 @@ export default function InsightsScreen({ navigation }: Props) {
     };
 
     const masteredPct = totalQCount > 0 ? Math.round((masteredCount / totalQCount) * 100) : 0;
+    // Coverage counts only questions the user actually engaged with (answered),
+    // not every question that appeared in a session pool.
     const uniqueQsSeen = (() => {
       const seen = new Set<number>();
-      sessionRecords.forEach(r => r.history.forEach(h => seen.add(h.questionIndex)));
+      sessionRecords.forEach(r => r.history.forEach(h => {
+        if (h.userLetters && h.userLetters.length > 0) seen.add(h.questionIndex);
+      }));
       return seen.size;
     })();
     const coveragePct = totalQCount > 0 ? Math.round((uniqueQsSeen / totalQCount) * 100) : 0;
