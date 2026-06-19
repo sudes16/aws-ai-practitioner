@@ -25,7 +25,7 @@ import {
   ScoreSession,
   SessionRecord,
 } from '../utils/storage';
-import { getTotalCount, buildIndices } from '../utils/quizEngine';
+import { getTotalCount, buildIndices, getDomainCounts, getDomainForIndex } from '../utils/quizEngine';
 import { useTheme } from '../contexts/ThemeContext';
 import { ColorScheme } from '../constants/colors';
 import { shadow, SHARED_STYLES } from '../utils/styleUtils';
@@ -34,6 +34,10 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Insights'>;
 
 const DOMAIN_NUMS = [1, 2, 3, 4, 5] as const;
 const TREND_COUNT = 15;
+// Domain breakdown gating: hide a percentage until at least this many attempts
+// in the domain, and scale by coverage so a tiny sample can't claim mastery.
+const MIN_DOMAIN_SAMPLE = 5;
+const DOMAIN_CONF_FLOOR = 0.5; // coverage at/above 50% = full confidence
 
 const HIST_BUCKETS = [
   { label: '<50%',   min: 0,  max: 49  },
@@ -185,17 +189,25 @@ export default function InsightsScreen({ navigation }: Props) {
     const bestScore = totalSessions === 0 ? 0 : Math.max(...filteredHistory.map(h => h.pct));
     const trendSessions = [...filteredHistory].slice(0, TREND_COUNT).reverse();
 
-    const domainTotals: Record<number, { c: number; t: number }> = {};
-    filteredHistory.forEach(s => {
-      if (s.domainBreakdown) {
-        Object.entries(s.domainBreakdown).forEach(([key, val]) => {
-          const d = Number(key);
-          if (!domainTotals[d]) domainTotals[d] = { c: 0, t: 0 };
-          domainTotals[d].c += val.c;
-          domainTotals[d].t += val.t;
-        });
-      }
-    });
+    // Per-domain stats derived from full session history (last 25 sessions).
+    // Tracks UNIQUE questions seen per domain so coverage reflects bank progress,
+    // not raw attempt count. Hotspots are excluded (no measurable accuracy).
+    const scopedRecords = tabKey === 'all'
+      ? sessionRecords
+      : tabKey === 'exam'
+        ? sessionRecords.filter(r => r.mode === 'exam')
+        : sessionRecords.filter(r => r.mode === 'practice');
+    const bankCounts = getDomainCounts();
+    const domainStats: Record<number, { seen: Set<number>; correct: number; attempts: number }> = {};
+    DOMAIN_NUMS.forEach(d => { domainStats[d] = { seen: new Set(), correct: 0, attempts: 0 }; });
+    scopedRecords.forEach(r => r.history.forEach(h => {
+      if (h.isHotspot) return;
+      if (!h.userLetters || h.userLetters.length === 0) return;
+      const d = getDomainForIndex(h.questionIndex);
+      domainStats[d].seen.add(h.questionIndex);
+      domainStats[d].attempts++;
+      if (h.correct) domainStats[d].correct++;
+    }));
 
     const passedCount    = filteredHistory.filter(s => s.pct >= 70).length;
     const passRate       = totalSessions > 0 ? Math.round((passedCount / totalSessions) * 100) : 0;
@@ -269,15 +281,19 @@ export default function InsightsScreen({ navigation }: Props) {
     })();
     const coveragePct = totalQCount > 0 ? Math.round((uniqueQsSeen / totalQCount) * 100) : 0;
 
-    // Exam readiness: weighted composite of pass rate, recent avg, and coverage.
-    // 50% pass rate + 30% avg of last 3 + 20% coverage. Capped at 100.
+    // Exam readiness: weighted composite of pass rate, recent avg, and coverage,
+    // scaled by a coverage-based confidence factor so a single high-scoring session
+    // can't claim full readiness. Confidence reaches 1.0 at 50% coverage; below that
+    // the score is scaled down proportionally.
     const recentAvg = (() => {
       const last3 = filteredHistory.slice(0, 3);
       if (last3.length === 0) return 0;
       return Math.round(last3.reduce((s, h) => s + h.pct, 0) / last3.length);
     })();
+    const rawReadiness = passRate * 0.5 + recentAvg * 0.3 + coveragePct * 0.2;
+    const confidence = Math.min(1, coveragePct / 50);
     const readinessScore = totalSessions > 0
-      ? Math.min(100, Math.round(passRate * 0.5 + recentAvg * 0.3 + coveragePct * 0.2))
+      ? Math.min(100, Math.round(rawReadiness * confidence))
       : 0;
     const readinessColor = readinessScore >= 70 ? colors.correct
       : readinessScore >= 50 ? colors.awsOrange
@@ -366,7 +382,7 @@ export default function InsightsScreen({ navigation }: Props) {
                 Based on pass rate, recent scores, and question coverage.
               </Text>
               <Text style={styles.readinessHint}>
-                Calculated from {totalSessions} {totalSessions === 1 ? 'session' : 'sessions'}.
+                Calculated from {totalSessions} {totalSessions === 1 ? 'session' : 'sessions'} • {coveragePct}% coverage{coveragePct < 50 ? ' (low — score is scaled down until you reach 50%)' : ''}.
               </Text>
             </View>
 
@@ -415,7 +431,22 @@ export default function InsightsScreen({ navigation }: Props) {
             <Text style={shared.sectionLabel}>DOMAIN BREAKDOWN</Text>
             <View style={shared.card}>
               {(() => {
-                const weakDomains = DOMAIN_NUMS.filter(d => (domainTotals[d]?.t > 0 && (domainTotals[d].c / domainTotals[d].t) < 0.7));
+                const eligible = DOMAIN_NUMS.filter(d => domainStats[d].attempts >= MIN_DOMAIN_SAMPLE);
+                const weakDomains = eligible.filter(d => {
+                  const data = domainStats[d];
+                  const bankTotal = bankCounts[d] || 0;
+                  const coverage = bankTotal > 0 ? data.seen.size / bankTotal : 0;
+                  const conf = Math.min(1, coverage / DOMAIN_CONF_FLOOR);
+                  const scored = (data.correct / data.attempts) * conf;
+                  return scored < 0.7;
+                });
+                if (eligible.length === 0) {
+                  return (
+                    <View style={[styles.focusCallout, { backgroundColor: colors.awsOrange + '15', borderLeftColor: colors.awsOrange }]}>
+                      <Text style={[styles.focusText, { color: colors.awsOrange }]}>ℹ Not enough data yet — answer at least {MIN_DOMAIN_SAMPLE} questions per domain.</Text>
+                    </View>
+                  );
+                }
                 return weakDomains.length > 0 ? (
                   <View style={styles.focusCallout}>
                     <Text style={styles.focusText}>⚠ Focus on: {weakDomains.map(d => DOMAIN_LABELS[d]).join(', ')}</Text>
@@ -427,18 +458,28 @@ export default function InsightsScreen({ navigation }: Props) {
                 );
               })()}
               {DOMAIN_NUMS.map(d => {
-                const data = domainTotals[d];
-                const pct = data && data.t > 0 ? Math.round((data.c / data.t) * 100) : null;
+                const data = domainStats[d];
+                const bankTotal = bankCounts[d] || 0;
+                const ungated = data.attempts < MIN_DOMAIN_SAMPLE;
+                const accuracy = data.attempts > 0 ? data.correct / data.attempts : 0;
+                const coverage = bankTotal > 0 ? data.seen.size / bankTotal : 0;
+                const conf = Math.min(1, coverage / DOMAIN_CONF_FLOOR);
+                const pct = ungated ? null : Math.round(accuracy * conf * 100);
                 const barColor = pct === null ? colors.border : pct >= 70 ? colors.correct : pct >= 50 ? colors.awsOrange : colors.wrong;
                 return (
                   <View key={d} style={styles.domainRow}>
                     <View style={styles.domainInfo}>
                       <Text style={styles.domainName} numberOfLines={1}>{DOMAIN_LABELS[d]}</Text>
-                      {pct !== null && <Text style={[styles.domainPctBadge, { backgroundColor: barColor + '20', color: barColor }]}>{pct}%</Text>}
+                      {pct !== null
+                        ? <Text style={[styles.domainPctBadge, { backgroundColor: barColor + '20', color: barColor }]}>{pct}%</Text>
+                        : <Text style={styles.domainPctBadgeMuted}>Need {MIN_DOMAIN_SAMPLE - data.attempts} more</Text>}
                     </View>
                     <View style={styles.domainBarTrack}>
                       <View style={[styles.domainBarFill, { width: pct !== null ? `${pct}%` as any : '0%', backgroundColor: barColor }]} />
                     </View>
+                    <Text style={styles.domainSubtitle}>
+                      {data.seen.size} of {bankTotal} answered • {data.correct}/{data.attempts} correct
+                    </Text>
                     <TouchableOpacity
                       style={styles.domainPracticeBtn}
                       onPress={() => setPracticeTarget(d as DomainFilter)}
@@ -644,8 +685,10 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   domainInfo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   domainName: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, flex: 1 },
   domainPctBadge: { fontSize: 10, fontWeight: '800', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' },
+  domainPctBadgeMuted: { fontSize: 10, fontWeight: '700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, overflow: 'hidden', backgroundColor: colors.border, color: colors.textSecondary },
   domainBarTrack: { height: 8, borderRadius: 4, backgroundColor: colors.border, overflow: 'hidden', marginBottom: 6 },
   domainBarFill: { height: 8, borderRadius: 4 },
+  domainSubtitle: { fontSize: 11, color: colors.textSecondary, marginBottom: 6 },
   domainPracticeBtn: { alignSelf: 'flex-end', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, backgroundColor: colors.background, borderWidth: 1.5, borderColor: colors.awsOrange },
   domainPracticeBtnText: { fontSize: 11, fontWeight: '800', color: colors.awsOrange },
   // ── Modal styles ──
