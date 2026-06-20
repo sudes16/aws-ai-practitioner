@@ -88,6 +88,173 @@ type InsightsCache = {
   masteredCount: number;
   sessionRecords: SessionRecord[];
 };
+
+// Everything renderPage needs that DOES NOT depend on theme/colors. Pre-computed
+// once per (scoreHistory, sessionRecords) change and reused for all three tabs.
+type TabComputed = {
+  filteredHistory: ScoreSession[];
+  scopedFull: ScoreSession[];
+  scopedRecords: SessionRecord[];
+  totalSessions: number;
+  avgScore: number;
+  bestPractice: number;
+  bestExam: number;
+  bestScore: number;
+  practiceBestEligible: number;
+  examBestEligible: number;
+  bestEligible: number;
+  abandonedCount: number;
+  lastSessionISO: string | undefined;
+  trendSessions: ScoreSession[];
+  passRate: number;
+  completionRate: number;
+  scoreDelta: number | null;
+  streak: number;
+  bestStreak: number;
+  histCounts: { label: string; min: number; max: number; count: number }[];
+  histMax: number;
+  domainStats: Record<number, { seenSize: number; correct: number; attempts: number }>;
+  coveragePct: number;
+  uniqueQsSeen: number;
+  readinessScore: number;
+};
+
+function computeTab(
+  tabKey: TabKey,
+  scoreHistory: ScoreSession[],
+  sessionRecords: SessionRecord[],
+  totalQCount: number,
+  uniqueQsSeen: number,
+): TabComputed {
+  const withAnswers = scoreHistory.filter(s => resolveAnswered(s) > 0);
+  const filteredHistory = tabKey === 'all'
+    ? withAnswers
+    : tabKey === 'exam'
+      ? withAnswers.filter(s => s.mode === 'exam')
+      : withAnswers.filter(s => s.mode !== 'exam');
+
+  const scopedFull = tabKey === 'all'
+    ? scoreHistory
+    : tabKey === 'exam'
+      ? scoreHistory.filter(s => s.mode === 'exam')
+      : scoreHistory.filter(s => s.mode !== 'exam');
+  const abandonedCount = scopedFull.filter(s => s.quit).length;
+  const lastSessionISO = scopedFull[0]?.date;
+
+  const totalSessions = filteredHistory.length;
+  const avgScore = totalSessions === 0
+    ? 0
+    : Math.round(filteredHistory.reduce((s, h) => s + h.pct, 0) / totalSessions);
+
+  const practiceBestEligibleArr = filteredHistory.filter(h => h.mode !== 'exam' && !h.quit && (h.questionCount ?? 0) >= BEST_SCORE_MIN_QS);
+  const examBestEligibleArr = filteredHistory.filter(h => h.mode === 'exam' && !h.quit && (h.questionCount ?? 0) >= BEST_SCORE_MIN_QS);
+  const bestPractice = practiceBestEligibleArr.length === 0 ? 0 : Math.max(...practiceBestEligibleArr.map(h => h.pct));
+  const bestExam = examBestEligibleArr.length === 0 ? 0 : Math.max(...examBestEligibleArr.map(h => h.pct));
+  const bestEligibleArr = tabKey === 'exam' ? examBestEligibleArr : tabKey === 'practice' ? practiceBestEligibleArr : [...practiceBestEligibleArr, ...examBestEligibleArr];
+  const bestScore = bestEligibleArr.length === 0 ? 0 : Math.max(...bestEligibleArr.map(h => h.pct));
+  const trendSessions = [...filteredHistory].slice(0, TREND_COUNT).reverse();
+
+  const scopedRecords = tabKey === 'all'
+    ? sessionRecords
+    : tabKey === 'exam'
+      ? sessionRecords.filter(r => r.mode === 'exam')
+      : sessionRecords.filter(r => r.mode === 'practice');
+
+  const domainStatsRaw: Record<number, { seen: Set<number>; correct: number; attempts: number }> = {};
+  DOMAIN_NUMS.forEach(d => { domainStatsRaw[d] = { seen: new Set(), correct: 0, attempts: 0 }; });
+  scopedRecords.forEach(r => r.history.forEach(h => {
+    if (h.correct === null) return;
+    if (!h.userLetters || h.userLetters.length === 0) return;
+    const d = getDomainForIndex(h.questionIndex);
+    domainStatsRaw[d].seen.add(h.questionIndex);
+    domainStatsRaw[d].attempts++;
+    if (h.correct) domainStatsRaw[d].correct++;
+  }));
+  const domainStats: Record<number, { seenSize: number; correct: number; attempts: number }> = {};
+  DOMAIN_NUMS.forEach(d => {
+    domainStats[d] = {
+      seenSize: domainStatsRaw[d].seen.size,
+      correct: domainStatsRaw[d].correct,
+      attempts: domainStatsRaw[d].attempts,
+    };
+  });
+
+  const passedCount = filteredHistory.filter(s => s.pct >= 70).length;
+  const passRate = totalSessions > 0 ? Math.round((passedCount / totalSessions) * 100) : 0;
+  const completedCount = filteredHistory.filter(s => !s.quit).length;
+  const completionRate = totalSessions > 0 ? Math.round((completedCount / totalSessions) * 100) : 0;
+
+  const scoreDelta = filteredHistory.length >= 2
+    ? filteredHistory[0].pct - filteredHistory[filteredHistory.length - 1].pct
+    : null;
+
+  const streak = (() => {
+    if (scoreHistory.length === 0) return 0;
+    const days = new Set(scoreHistory.map(s => toLocalDateKey(s.date)));
+    let count = 0;
+    const cursor = new Date();
+    if (!days.has(toLocalDateKey(cursor))) cursor.setDate(cursor.getDate() - 1);
+    while (days.has(toLocalDateKey(cursor))) {
+      count++;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    return count;
+  })();
+
+  const bestStreak = (() => {
+    if (scoreHistory.length === 0) return 0;
+    const days = [...new Set(scoreHistory.map(s => toLocalDateKey(s.date)))].sort();
+    let best = 1;
+    let run = 1;
+    for (let i = 1; i < days.length; i++) {
+      const prev = new Date(days[i - 1]).getTime();
+      const curr = new Date(days[i]).getTime();
+      if (curr - prev === 86_400_000) {
+        run++;
+        if (run > best) best = run;
+      } else {
+        run = 1;
+      }
+    }
+    return best;
+  })();
+
+  const histCounts = HIST_BUCKETS.map(b => ({
+    ...b,
+    count: filteredHistory.filter(s => s.pct >= b.min && s.pct <= b.max).length,
+  }));
+  const histMax = Math.max(...histCounts.map(b => b.count), 1);
+
+  const coveragePct = totalQCount > 0 ? Math.round((uniqueQsSeen / totalQCount) * 100) : 0;
+
+  const recentAvg = (() => {
+    const last3 = filteredHistory.slice(0, 3);
+    if (last3.length === 0) return 0;
+    return Math.round(last3.reduce((s, h) => s + h.pct, 0) / last3.length);
+  })();
+  const rawReadiness = passRate * 0.5 + recentAvg * 0.3 + coveragePct * 0.2;
+  const confidence = Math.min(1, coveragePct / 50);
+  const readinessScore = totalSessions > 0
+    ? Math.min(100, Math.round(rawReadiness * confidence))
+    : 0;
+
+  return {
+    filteredHistory, scopedFull, scopedRecords,
+    totalSessions, avgScore,
+    bestPractice, bestExam, bestScore,
+    practiceBestEligible: practiceBestEligibleArr.length,
+    examBestEligible: examBestEligibleArr.length,
+    bestEligible: bestEligibleArr.length,
+    abandonedCount, lastSessionISO,
+    trendSessions,
+    passRate, completionRate, scoreDelta,
+    streak, bestStreak,
+    histCounts, histMax,
+    domainStats,
+    coveragePct, uniqueQsSeen,
+    readinessScore,
+  };
+}
 let insightsCache: InsightsCache | null = null;
 
 export default function InsightsScreen({ navigation }: Props) {
@@ -169,105 +336,51 @@ export default function InsightsScreen({ navigation }: Props) {
     }
   };
 
+  // Heavy work memoised. uniqueQsSeen iterates every history row, and each tab's
+  // domainStats walks scopedRecords again — doing it once per data change instead
+  // of on every render (theme toggle, masteredCount bump, etc.) keeps the screen
+  // snappy as session history grows toward the 365-entry cap.
+  const uniqueQsSeen = useMemo(() => {
+    const seen = new Set<number>();
+    sessionRecords.forEach(r => r.history.forEach(h => {
+      if (h.userLetters && h.userLetters.length > 0) seen.add(h.questionIndex);
+    }));
+    return seen.size;
+  }, [sessionRecords]);
+
+  const tabData = useMemo(() => ({
+    all: computeTab('all', scoreHistory, sessionRecords, totalQCount, uniqueQsSeen),
+    practice: computeTab('practice', scoreHistory, sessionRecords, totalQCount, uniqueQsSeen),
+    exam: computeTab('exam', scoreHistory, sessionRecords, totalQCount, uniqueQsSeen),
+  }), [scoreHistory, sessionRecords, totalQCount, uniqueQsSeen]);
+
+  const bankCounts = useMemo(() => getDomainCounts(), []);
+
   const renderPage = ({ item }: { item: TabKey }) => {
     const tabKey = item;
-    // Calculate data independently per page
-    const withAnswers = scoreHistory.filter(s => resolveAnswered(s) > 0);
-    const filteredHistory = tabKey === 'all'
-      ? withAnswers
-      : tabKey === 'exam'
-        ? withAnswers.filter(s => s.mode === 'exam')
-        : withAnswers.filter(s => s.mode !== 'exam');
+    const data = tabData[tabKey];
+    const {
+      scopedFull,
+      totalSessions, avgScore,
+      bestPractice, bestExam, bestScore,
+      practiceBestEligible, examBestEligible, bestEligible,
+      abandonedCount, lastSessionISO,
+      trendSessions,
+      passRate, completionRate, scoreDelta,
+      streak, bestStreak,
+      histCounts, histMax,
+      domainStats,
+      coveragePct,
+      readinessScore,
+    } = data;
 
-    // Abandoned: any session the user did not complete (quit at any point).
-    const scopedFull = tabKey === 'all'
-      ? scoreHistory
-      : tabKey === 'exam'
-        ? scoreHistory.filter(s => s.mode === 'exam')
-        : scoreHistory.filter(s => s.mode !== 'exam');
-    const abandonedCount = scopedFull.filter(s => s.quit).length;
-    const lastSessionISO = scopedFull[0]?.date;
-
-    const totalSessions = filteredHistory.length;
-    const avgScore = totalSessions === 0 ? 0 : Math.round(filteredHistory.reduce((s, h) => s + h.pct, 0) / totalSessions);
-    // Best Score: only completed sessions of >=30 questions count (exams always qualify).
-    // Quit sessions are excluded since their pct is a partial-credit estimate, not a real score.
-    // Split by mode so a high practice score can't outrank an exam in the same headline.
-    const practiceBestEligible = filteredHistory.filter(h => h.mode !== 'exam' && !h.quit && (h.questionCount ?? 0) >= BEST_SCORE_MIN_QS);
-    const examBestEligible = filteredHistory.filter(h => h.mode === 'exam' && !h.quit && (h.questionCount ?? 0) >= BEST_SCORE_MIN_QS);
-    const bestPractice = practiceBestEligible.length === 0 ? 0 : Math.max(...practiceBestEligible.map(h => h.pct));
-    const bestExam = examBestEligible.length === 0 ? 0 : Math.max(...examBestEligible.map(h => h.pct));
-    // Single-mode tabs collapse to the relevant pool.
-    const bestEligible = tabKey === 'exam' ? examBestEligible : tabKey === 'practice' ? practiceBestEligible : [...practiceBestEligible, ...examBestEligible];
-    const bestScore = bestEligible.length === 0 ? 0 : Math.max(...bestEligible.map(h => h.pct));
-    const trendSessions = [...filteredHistory].slice(0, TREND_COUNT).reverse();
-
-    // Per-domain stats derived from full session history (last 25 sessions).
-    // Tracks UNIQUE questions seen per domain so coverage reflects bank progress,
-    // not raw attempt count. Hotspots are excluded (no measurable accuracy).
-    const scopedRecords = tabKey === 'all'
-      ? sessionRecords
-      : tabKey === 'exam'
-        ? sessionRecords.filter(r => r.mode === 'exam')
-        : sessionRecords.filter(r => r.mode === 'practice');
-    const bankCounts = getDomainCounts();
-    const domainStats: Record<number, { seen: Set<number>; correct: number; attempts: number }> = {};
-    DOMAIN_NUMS.forEach(d => { domainStats[d] = { seen: new Set(), correct: 0, attempts: 0 }; });
-    scopedRecords.forEach(r => r.history.forEach(h => {
-      // Skip ungraded entries (unanswered, or unstructured hotspots without a checkable answer).
-      if (h.correct === null) return;
-      if (!h.userLetters || h.userLetters.length === 0) return;
-      const d = getDomainForIndex(h.questionIndex);
-      domainStats[d].seen.add(h.questionIndex);
-      domainStats[d].attempts++;
-      if (h.correct) domainStats[d].correct++;
-    }));
-
-    const passedCount    = filteredHistory.filter(s => s.pct >= 70).length;
-    const passRate       = totalSessions > 0 ? Math.round((passedCount / totalSessions) * 100) : 0;
-    const completedCount = filteredHistory.filter(s => !s.quit).length;
-    const completionRate = totalSessions > 0 ? Math.round((completedCount / totalSessions) * 100) : 0;
-
-    const scoreDelta = filteredHistory.length >= 2
-      ? filteredHistory[0].pct - filteredHistory[filteredHistory.length - 1].pct
-      : null;
-
-    const streak = (() => {
-      if (scoreHistory.length === 0) return 0;
-      const days = new Set(scoreHistory.map(s => toLocalDateKey(s.date)));
-      let count = 0;
-      const cursor = new Date();
-      if (!days.has(toLocalDateKey(cursor))) cursor.setDate(cursor.getDate() - 1);
-      while (days.has(toLocalDateKey(cursor))) {
-        count++;
-        cursor.setDate(cursor.getDate() - 1);
-      }
-      return count;
-    })();
-
-    const bestStreak = (() => {
-      if (scoreHistory.length === 0) return 0;
-      const days = [...new Set(scoreHistory.map(s => toLocalDateKey(s.date)))].sort();
-      let best = 1;
-      let run = 1;
-      for (let i = 1; i < days.length; i++) {
-        const prev = new Date(days[i - 1]).getTime();
-        const curr = new Date(days[i]).getTime();
-        if (curr - prev === 86_400_000) {
-          run++;
-          if (run > best) best = run;
-        } else {
-          run = 1;
-        }
-      }
-      return best;
-    })();
-
-    const histCounts = HIST_BUCKETS.map(b => ({
-      ...b,
-      count: filteredHistory.filter(s => s.pct >= b.min && s.pct <= b.max).length,
-    }));
-    const histMax = Math.max(...histCounts.map(b => b.count), 1);
+    const readinessColor = readinessScore >= 70 ? colors.correct
+      : readinessScore >= 50 ? colors.awsOrange
+      : colors.wrong;
+    const readinessLabel = readinessScore >= 80 ? 'Exam-ready'
+      : readinessScore >= 60 ? 'Almost there'
+      : readinessScore >= 40 ? 'Keep practicing'
+      : 'Just getting started';
 
     const chartData = {
       labels: trendSessions.map((_, i) => (i + 1).toString()),
@@ -284,38 +397,6 @@ export default function InsightsScreen({ navigation }: Props) {
     };
 
     const masteredPct = totalQCount > 0 ? Math.round((masteredCount / totalQCount) * 100) : 0;
-    // Coverage counts only questions the user actually engaged with (answered),
-    // not every question that appeared in a session pool.
-    const uniqueQsSeen = (() => {
-      const seen = new Set<number>();
-      sessionRecords.forEach(r => r.history.forEach(h => {
-        if (h.userLetters && h.userLetters.length > 0) seen.add(h.questionIndex);
-      }));
-      return seen.size;
-    })();
-    const coveragePct = totalQCount > 0 ? Math.round((uniqueQsSeen / totalQCount) * 100) : 0;
-
-    // Exam readiness: weighted composite of pass rate, recent avg, and coverage,
-    // scaled by a coverage-based confidence factor so a single high-scoring session
-    // can't claim full readiness. Confidence reaches 1.0 at 50% coverage; below that
-    // the score is scaled down proportionally.
-    const recentAvg = (() => {
-      const last3 = filteredHistory.slice(0, 3);
-      if (last3.length === 0) return 0;
-      return Math.round(last3.reduce((s, h) => s + h.pct, 0) / last3.length);
-    })();
-    const rawReadiness = passRate * 0.5 + recentAvg * 0.3 + coveragePct * 0.2;
-    const confidence = Math.min(1, coveragePct / 50);
-    const readinessScore = totalSessions > 0
-      ? Math.min(100, Math.round(rawReadiness * confidence))
-      : 0;
-    const readinessColor = readinessScore >= 70 ? colors.correct
-      : readinessScore >= 50 ? colors.awsOrange
-      : colors.wrong;
-    const readinessLabel = readinessScore >= 80 ? 'Exam-ready'
-      : readinessScore >= 60 ? 'Almost there'
-      : readinessScore >= 40 ? 'Keep practicing'
-      : 'Just getting started';
 
     return (
       <ScrollView
@@ -353,14 +434,14 @@ export default function InsightsScreen({ navigation }: Props) {
                     <Text style={[styles.summaryValue, { color: bestPractice >= 70 ? colors.correct : colors.awsOrange }]}>{bestPractice}%</Text>
                     <Text style={styles.summaryLabel}>Best Practice</Text>
                     <Text style={styles.summarySubLabel} numberOfLines={1}>
-                      {practiceBestEligible.length === 0 ? `Needs ${BEST_SCORE_MIN_QS}+ Qs` : `${practiceBestEligible.length} qualifying`}
+                      {practiceBestEligible === 0 ? `Needs ${BEST_SCORE_MIN_QS}+ Qs` : `${practiceBestEligible} qualifying`}
                     </Text>
                   </View>
                   <View style={styles.summaryCard}>
                     <Text style={[styles.summaryValue, { color: bestExam >= 70 ? colors.correct : colors.awsOrange }]}>{bestExam}%</Text>
                     <Text style={styles.summaryLabel}>Best Exam</Text>
                     <Text style={styles.summarySubLabel} numberOfLines={1}>
-                      {examBestEligible.length === 0 ? 'No exam yet' : `${examBestEligible.length} exam${examBestEligible.length === 1 ? '' : 's'}`}
+                      {examBestEligible === 0 ? 'No exam yet' : `${examBestEligible} exam${examBestEligible === 1 ? '' : 's'}`}
                     </Text>
                   </View>
                 </>
@@ -369,7 +450,7 @@ export default function InsightsScreen({ navigation }: Props) {
                   <Text style={[styles.summaryValue, { color: bestScore >= 70 ? colors.correct : colors.awsOrange }]}>{bestScore}%</Text>
                   <Text style={styles.summaryLabel}>Best Score</Text>
                   <Text style={styles.summarySubLabel} numberOfLines={1}>
-                    {bestEligible.length === 0 ? `Needs ${BEST_SCORE_MIN_QS}+ Qs completed` : `from ${bestEligible.length} qualifying`}
+                    {bestEligible === 0 ? `Needs ${BEST_SCORE_MIN_QS}+ Qs completed` : `from ${bestEligible} qualifying`}
                   </Text>
                 </View>
               )}
@@ -425,7 +506,17 @@ export default function InsightsScreen({ navigation }: Props) {
             <Text style={shared.sectionLabel}>SCORE TREND (LAST {trendSessions.length})</Text>
             <View style={[shared.card, { paddingLeft: 0, paddingRight: 0 }]}>
               {trendSessions.length < 2 ? (
-                <Text style={styles.noDataHint}>Need at least 2 sessions for trend</Text>
+                <View style={styles.trendEmpty}>
+                  <Text style={styles.trendEmptyIcon}>📈</Text>
+                  <Text style={styles.trendEmptyTitle}>
+                    {trendSessions.length === 0 ? 'No trend yet' : 'One session in the books'}
+                  </Text>
+                  <Text style={styles.trendEmptyBody}>
+                    {trendSessions.length === 0
+                      ? 'Complete at least 2 sessions to see your score trend over time.'
+                      : 'Take one more session to start tracking your score trend.'}
+                  </Text>
+                </View>
               ) : (
                 <LineChart
                   data={chartData}
@@ -469,11 +560,11 @@ export default function InsightsScreen({ navigation }: Props) {
               {(() => {
                 const eligible = DOMAIN_NUMS.filter(d => domainStats[d].attempts >= MIN_DOMAIN_SAMPLE);
                 const weakDomains = eligible.filter(d => {
-                  const data = domainStats[d];
+                  const dStats = domainStats[d];
                   const bankTotal = bankCounts[d] || 0;
-                  const coverage = bankTotal > 0 ? data.seen.size / bankTotal : 0;
+                  const coverage = bankTotal > 0 ? dStats.seenSize / bankTotal : 0;
                   const conf = Math.min(1, coverage / DOMAIN_CONF_FLOOR);
-                  const scored = (data.correct / data.attempts) * conf;
+                  const scored = (dStats.correct / dStats.attempts) * conf;
                   return scored < 0.7;
                 });
                 if (eligible.length === 0) {
@@ -494,11 +585,11 @@ export default function InsightsScreen({ navigation }: Props) {
                 );
               })()}
               {DOMAIN_NUMS.map(d => {
-                const data = domainStats[d];
+                const dStats = domainStats[d];
                 const bankTotal = bankCounts[d] || 0;
-                const ungated = data.attempts < MIN_DOMAIN_SAMPLE;
-                const accuracy = data.attempts > 0 ? data.correct / data.attempts : 0;
-                const coverage = bankTotal > 0 ? data.seen.size / bankTotal : 0;
+                const ungated = dStats.attempts < MIN_DOMAIN_SAMPLE;
+                const accuracy = dStats.attempts > 0 ? dStats.correct / dStats.attempts : 0;
+                const coverage = bankTotal > 0 ? dStats.seenSize / bankTotal : 0;
                 const conf = Math.min(1, coverage / DOMAIN_CONF_FLOOR);
                 const pct = ungated ? null : Math.round(accuracy * conf * 100);
                 const barColor = pct === null ? colors.border : pct >= 70 ? colors.correct : pct >= 50 ? colors.awsOrange : colors.wrong;
@@ -508,13 +599,13 @@ export default function InsightsScreen({ navigation }: Props) {
                       <Text style={styles.domainName} numberOfLines={1}>{DOMAIN_LABELS[d]}</Text>
                       {pct !== null
                         ? <Text style={[styles.domainPctBadge, { backgroundColor: barColor + '20', color: barColor }]}>{pct}%</Text>
-                        : <Text style={styles.domainPctBadgeMuted}>Need {MIN_DOMAIN_SAMPLE - data.attempts} more</Text>}
+                        : <Text style={styles.domainPctBadgeMuted}>Need {MIN_DOMAIN_SAMPLE - dStats.attempts} more</Text>}
                     </View>
                     <View style={styles.domainBarTrack}>
                       <View style={[styles.domainBarFill, { width: pct !== null ? `${pct}%` as any : '0%', backgroundColor: barColor }]} />
                     </View>
                     <Text style={styles.domainSubtitle}>
-                      {data.seen.size} of {bankTotal} answered • {data.correct}/{data.attempts} correct
+                      {dStats.seenSize} of {bankTotal} answered • {dStats.correct}/{dStats.attempts} correct
                     </Text>
                     <TouchableOpacity
                       style={styles.domainPracticeBtn}
@@ -711,6 +802,10 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   readinessLabel: { fontSize: 13, fontWeight: '700' },
   readinessHint: { fontSize: 11, color: colors.textMuted, marginTop: 8 },
   noDataHint: { textAlign: 'center', padding: 20, color: colors.textMuted, fontSize: 13 },
+  trendEmpty: { paddingVertical: 32, paddingHorizontal: 24, alignItems: 'center' },
+  trendEmptyIcon: { fontSize: 32, marginBottom: 8 },
+  trendEmptyTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
+  trendEmptyBody: { fontSize: 12, color: colors.textSecondary, textAlign: 'center', lineHeight: 18 },
   histRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   histLabel: { width: 50, fontSize: 11, color: colors.textSecondary, fontWeight: '600' },
   histTrack: { flex: 1, height: 12, backgroundColor: colors.border, borderRadius: 6, overflow: 'hidden', marginHorizontal: 8 },
