@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import Constants from 'expo-constants';
@@ -192,6 +193,60 @@ export default function SettingsScreen({ navigation }: Props) {
       `This will clear the record of ${examSeenCount} used questions so the next exam picks from the full bank again. Continue?`,
       'Reset',
       async () => { await resetExamHistory(); setExamSeenCount(0); },
+    );
+  };
+
+  // Nuke every key this app owns. Theme preference and OTA cache are preserved
+  // (UI choice + remote bank cache, neither is personal data). Notifications
+  // are explicitly cancelled before keys are dropped so nothing fires later.
+  const handleResetAllData = () => {
+    const lines = [
+      'This will permanently delete:',
+      '• Profile (name, exam date)',
+      '• All score history & session records',
+      '• Mastered & spaced repetition progress',
+      '• Exam rotation history',
+      '• All notes & question reports',
+      '• AI API key & reminder settings',
+      '',
+      'Your theme preference is kept. This cannot be undone.',
+    ].join('\n');
+    confirmAction(
+      'Reset ALL Data?',
+      lines,
+      'Erase Everything',
+      async () => {
+        try {
+          if (Platform.OS !== 'web') {
+            await cancelReminder().catch(() => {});
+          }
+          const KEEP = new Set(['quiz_theme_mode', 'ota_questions_cache', 'ota_questions_etag']);
+          const allKeys = await AsyncStorage.getAllKeys();
+          const toRemove = allKeys.filter(k => !KEEP.has(k));
+          if (toRemove.length > 0) await AsyncStorage.multiRemove(toRemove);
+          setProfile(null);
+          setObName('');
+          setObDate(null);
+          setEditing(false);
+          setAiKey('');
+          setExamSeenCount(0);
+          setSrRecordCount(0);
+          setReportCount(0);
+          setMasteredCount(0);
+          setReminderEnabled(false);
+          if (Platform.OS === 'web') {
+            window.alert('All data has been erased. Reload the app for a fully fresh state.');
+          } else {
+            Alert.alert('Reset complete', 'All data has been erased. Restart the app for a fully fresh state.');
+          }
+        } catch (err) {
+          if (Platform.OS === 'web') {
+            window.alert(`Reset failed: ${String(err)}`);
+          } else {
+            Alert.alert('Reset failed', String(err));
+          }
+        }
+      },
     );
   };
 
@@ -629,6 +684,19 @@ export default function SettingsScreen({ navigation }: Props) {
               <Text style={[styles.resetBtnText, srRecordCount === 0 && styles.resetBtnTextDisabled]}>Reset</Text>
             </TouchableOpacity>
           </View>
+          <View style={styles.rowDivider} />
+          <TouchableOpacity
+            style={styles.dangerRow}
+            onPress={handleResetAllData}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.dangerRowIcon}>⚠️</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.dangerRowLabel}>Reset all data</Text>
+              <Text style={styles.dangerRowSub}>Erase profile, progress, notes, AI key, and reminders</Text>
+            </View>
+            <Text style={styles.dangerRowChevron}>›</Text>
+          </TouchableOpacity>
         </View>
 
         {/* ── Question Reports ── */}
@@ -890,6 +958,17 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   resetBtnDisabled: { backgroundColor: colors.border, borderColor: colors.border },
   resetBtnText: { fontSize: 13, fontWeight: '700', color: colors.btnDanger },
   resetBtnTextDisabled: { color: colors.textSecondary },
+
+  // Reset-everything row — stronger visual to signal it nukes the lot.
+  dangerRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingVertical: 14,
+    backgroundColor: colors.btnDanger + '10',
+  },
+  dangerRowIcon: { fontSize: 20 },
+  dangerRowLabel: { fontSize: 15, fontWeight: '800', color: colors.btnDanger },
+  dangerRowSub: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  dangerRowChevron: { fontSize: 18, color: colors.btnDanger, fontWeight: '700' },
 
   // About
   aboutRow: { flexDirection: 'row', alignItems: 'flex-start', padding: 14, paddingHorizontal: 16, gap: 8 },
