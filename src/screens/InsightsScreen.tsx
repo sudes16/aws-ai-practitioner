@@ -191,7 +191,13 @@ export default function InsightsScreen({ navigation }: Props) {
     const avgScore = totalSessions === 0 ? 0 : Math.round(filteredHistory.reduce((s, h) => s + h.pct, 0) / totalSessions);
     // Best Score: only completed sessions of >=30 questions count (exams always qualify).
     // Quit sessions are excluded since their pct is a partial-credit estimate, not a real score.
-    const bestEligible = filteredHistory.filter(h => !h.quit && (h.questionCount ?? 0) >= BEST_SCORE_MIN_QS);
+    // Split by mode so a high practice score can't outrank an exam in the same headline.
+    const practiceBestEligible = filteredHistory.filter(h => h.mode !== 'exam' && !h.quit && (h.questionCount ?? 0) >= BEST_SCORE_MIN_QS);
+    const examBestEligible = filteredHistory.filter(h => h.mode === 'exam' && !h.quit && (h.questionCount ?? 0) >= BEST_SCORE_MIN_QS);
+    const bestPractice = practiceBestEligible.length === 0 ? 0 : Math.max(...practiceBestEligible.map(h => h.pct));
+    const bestExam = examBestEligible.length === 0 ? 0 : Math.max(...examBestEligible.map(h => h.pct));
+    // Single-mode tabs collapse to the relevant pool.
+    const bestEligible = tabKey === 'exam' ? examBestEligible : tabKey === 'practice' ? practiceBestEligible : [...practiceBestEligible, ...examBestEligible];
     const bestScore = bestEligible.length === 0 ? 0 : Math.max(...bestEligible.map(h => h.pct));
     const trendSessions = [...filteredHistory].slice(0, TREND_COUNT).reverse();
 
@@ -340,13 +346,32 @@ export default function InsightsScreen({ navigation }: Props) {
                    </Text>
                 )}
               </View>
-              <View style={styles.summaryCard}>
-                <Text style={[styles.summaryValue, { color: bestScore >= 70 ? colors.correct : colors.awsOrange }]}>{bestScore}%</Text>
-                <Text style={styles.summaryLabel}>Best Score</Text>
-                <Text style={styles.summarySubLabel} numberOfLines={1}>
-                  {bestEligible.length === 0 ? `Needs ${BEST_SCORE_MIN_QS}+ Qs completed` : `from ${bestEligible.length} qualifying`}
-                </Text>
-              </View>
+              {tabKey === 'all' ? (
+                <>
+                  <View style={styles.summaryCard}>
+                    <Text style={[styles.summaryValue, { color: bestPractice >= 70 ? colors.correct : colors.awsOrange }]}>{bestPractice}%</Text>
+                    <Text style={styles.summaryLabel}>Best Practice</Text>
+                    <Text style={styles.summarySubLabel} numberOfLines={1}>
+                      {practiceBestEligible.length === 0 ? `Needs ${BEST_SCORE_MIN_QS}+ Qs` : `${practiceBestEligible.length} qualifying`}
+                    </Text>
+                  </View>
+                  <View style={styles.summaryCard}>
+                    <Text style={[styles.summaryValue, { color: bestExam >= 70 ? colors.correct : colors.awsOrange }]}>{bestExam}%</Text>
+                    <Text style={styles.summaryLabel}>Best Exam</Text>
+                    <Text style={styles.summarySubLabel} numberOfLines={1}>
+                      {examBestEligible.length === 0 ? 'No exam yet' : `${examBestEligible.length} exam${examBestEligible.length === 1 ? '' : 's'}`}
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                <View style={styles.summaryCard}>
+                  <Text style={[styles.summaryValue, { color: bestScore >= 70 ? colors.correct : colors.awsOrange }]}>{bestScore}%</Text>
+                  <Text style={styles.summaryLabel}>Best Score</Text>
+                  <Text style={styles.summarySubLabel} numberOfLines={1}>
+                    {bestEligible.length === 0 ? `Needs ${BEST_SCORE_MIN_QS}+ Qs completed` : `from ${bestEligible.length} qualifying`}
+                  </Text>
+                </View>
+              )}
             </View>
 
             <View style={styles.summaryRow}>
