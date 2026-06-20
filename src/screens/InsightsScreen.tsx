@@ -29,6 +29,7 @@ import { getTotalCount, buildIndices, getDomainCounts, getDomainForIndex } from 
 import { useTheme } from '../contexts/ThemeContext';
 import { ColorScheme } from '../constants/colors';
 import { shadow, SHARED_STYLES } from '../utils/styleUtils';
+import { toLocalDateKey } from '../utils/dateUtils';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Insights'>;
 
@@ -233,11 +234,11 @@ export default function InsightsScreen({ navigation }: Props) {
 
     const streak = (() => {
       if (scoreHistory.length === 0) return 0;
-      const days = new Set(scoreHistory.map(s => s.date.slice(0, 10)));
+      const days = new Set(scoreHistory.map(s => toLocalDateKey(s.date)));
       let count = 0;
       const cursor = new Date();
-      if (!days.has(cursor.toISOString().slice(0, 10))) cursor.setDate(cursor.getDate() - 1);
-      while (days.has(cursor.toISOString().slice(0, 10))) {
+      if (!days.has(toLocalDateKey(cursor))) cursor.setDate(cursor.getDate() - 1);
+      while (days.has(toLocalDateKey(cursor))) {
         count++;
         cursor.setDate(cursor.getDate() - 1);
       }
@@ -246,7 +247,7 @@ export default function InsightsScreen({ navigation }: Props) {
 
     const bestStreak = (() => {
       if (scoreHistory.length === 0) return 0;
-      const days = [...new Set(scoreHistory.map(s => s.date.slice(0, 10)))].sort();
+      const days = [...new Set(scoreHistory.map(s => toLocalDateKey(s.date)))].sort();
       let best = 1;
       let run = 1;
       for (let i = 1; i < days.length; i++) {

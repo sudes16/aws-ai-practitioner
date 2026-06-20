@@ -27,6 +27,7 @@ import { scheduleExamCountdownNotifications } from '../utils/notificationService
 import { useTheme } from '../contexts/ThemeContext';
 import { ColorScheme } from '../constants/colors';
 import { cssVal, shadow, SHARED_STYLES } from '../utils/styleUtils';
+import { toLocalDateKey } from '../utils/dateUtils';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -748,9 +749,9 @@ export default function HomeScreen({ navigation }: Props) {
               // @ts-ignore — native HTML input on react-native-web
               <input
                 type="date"
-                value={obDate ? obDate.toISOString().slice(0, 10) : ''}
-                min={examMinDate.toISOString().slice(0, 10)}
-                max={examMaxDate.toISOString().slice(0, 10)}
+                value={obDate ? toLocalDateKey(obDate) : ''}
+                min={toLocalDateKey(examMinDate)}
+                max={toLocalDateKey(examMaxDate)}
                 onChange={(e: any) => {
                   const v = e.target.value;
                   setObDate(v ? new Date(v + 'T00:00:00') : null);
