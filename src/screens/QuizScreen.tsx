@@ -1373,11 +1373,21 @@ export default function QuizScreen({ navigation, route }: Props) {
             <Text style={styles.modalTitle}>Submit Exam?</Text>
             <Text style={styles.modalBody}>
               {(() => {
-                const answered = Object.values(examDraftAnswers).filter(a => a.length > 0).length;
-                const unanswered = totalQuestions - answered;
-                return unanswered > 0
-                  ? `You have ${unanswered} unanswered question${unanswered !== 1 ? 's' : ''}.\nOnce submitted, you cannot change your answers.`
-                  : 'Once submitted, you cannot change your answers.';
+                let unanswered = 0;
+                let unansweredHotspots = 0;
+                for (let i = 0; i < totalQuestions; i++) {
+                  const a = examDraftAnswers[i] ?? [];
+                  if (a.length === 0) {
+                    unanswered++;
+                    const q = questions[config.indices[i]];
+                    if (q?.is_hotspot) unansweredHotspots++;
+                  }
+                }
+                if (unanswered === 0) return 'Once submitted, you cannot change your answers.';
+                const hotspotNote = unansweredHotspots > 0
+                  ? ` (including ${unansweredHotspots} hotspot${unansweredHotspots !== 1 ? 's' : ''})`
+                  : '';
+                return `You have ${unanswered} unanswered question${unanswered !== 1 ? 's' : ''}${hotspotNote}.\nUnanswered count as wrong.\nOnce submitted, you cannot change your answers.`;
               })()}
             </Text>
             <View style={styles.modalBtns}>

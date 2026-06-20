@@ -160,6 +160,28 @@ export default function ExamResultScreen({ navigation }: Props) {
           <Text style={styles.passNote}>Pass mark: 70% ({Math.ceil(EXAM_TOTAL_QS * PASS_THRESHOLD_PCT / 100)}/{EXAM_TOTAL_QS})</Text>
         </View>
 
+        {/* ── Outcome breakdown: correct · wrong · unanswered ── */}
+        {(() => {
+          const totalWrong = history.filter(h => h.correct === false).length;
+          const totalUnanswered = history.filter(h => h.correct === null).length;
+          return (
+            <View style={styles.outcomeRow}>
+              <View style={styles.outcomePill}>
+                <Text style={[styles.outcomeNum, { color: colors.correct }]}>{totalCorrect}</Text>
+                <Text style={styles.outcomeLabel}>Correct</Text>
+              </View>
+              <View style={styles.outcomePill}>
+                <Text style={[styles.outcomeNum, { color: colors.wrong }]}>{totalWrong}</Text>
+                <Text style={styles.outcomeLabel}>Wrong</Text>
+              </View>
+              <View style={styles.outcomePill}>
+                <Text style={[styles.outcomeNum, { color: colors.textSecondary }]}>{totalUnanswered}</Text>
+                <Text style={styles.outcomeLabel}>Unanswered</Text>
+              </View>
+            </View>
+          );
+        })()}
+
         {/* ── History hint ── */}
         <Text style={styles.historyHint}>📋 Your results and answers are saved in History for later review</Text>
 
@@ -351,6 +373,24 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   },
   timeLabel: { fontSize: 14, color: colors.textSecondary, fontWeight: '600' },
   timeValue: { fontSize: 14, color: colors.textPrimary, fontWeight: '700' },
+
+  // ── Outcome breakdown row ────────────────────────────────────────────────
+  outcomeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  outcomePill: {
+    flex: 1,
+    backgroundColor: colors.cardBg,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  outcomeNum: { fontSize: 22, fontWeight: '800' },
+  outcomeLabel: { fontSize: 11, color: colors.textSecondary, fontWeight: '600', marginTop: 2 },
 
   // ── Domain Breakdown ────────────────────────────────────────────────────
   sectionTitle: {
