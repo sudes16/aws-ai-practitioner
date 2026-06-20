@@ -309,7 +309,7 @@ export default function ReviewScreen({ navigation, route }: Props) {
       </View>
 
       <View style={styles.filterWrap}>
-        <FlatList
+        <FlatList<(typeof FILTERS)[number]>
           ref={filterListRef}
           data={FILTERS}
           horizontal
