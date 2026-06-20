@@ -414,10 +414,10 @@ export default function InsightsScreen({ navigation }: Props) {
                 <View style={[styles.progressFill, { width: `${readinessScore}%` as any, backgroundColor: readinessColor }]} />
               </View>
               <Text style={styles.readinessHint}>
-                Based on pass rate, recent scores, and question coverage.
+                Based on pass rate, recent scores, and how many unique questions you’ve answered.
               </Text>
               <Text style={styles.readinessHint}>
-                Calculated from {totalSessions} {totalSessions === 1 ? 'session' : 'sessions'} • {coveragePct}% coverage{coveragePct < 50 ? ' (low — score is scaled down until you reach 50%)' : ''}.
+                Calculated from {totalSessions} {totalSessions === 1 ? 'session' : 'sessions'} • {coveragePct}% answered{coveragePct < 50 ? ' (low — score is scaled down until you reach 50%)' : ''}.
               </Text>
             </View>
 
@@ -538,12 +538,13 @@ export default function InsightsScreen({ navigation }: Props) {
               </View>
 
               <View style={[styles.progressHeader, { marginTop: 16 }]}>
-                <Text style={styles.progressTitle}>Coverage: {uniqueQsSeen}/{totalQCount}</Text>
+                <Text style={styles.progressTitle}>Answered: {uniqueQsSeen}/{totalQCount}</Text>
                 <Text style={[styles.progressPct, { color: colors.awsOrange }]}>{coveragePct}%</Text>
               </View>
               <View style={styles.progressTrack}>
                 <View style={[styles.progressFill, { width: `${coveragePct}%` as any, backgroundColor: colors.awsOrange }]} />
               </View>
+              <Text style={styles.progressCaption}>Unique questions you’ve answered across practice and exam sessions.</Text>
             </View>
 
             <View style={{ height: 32 }} />
@@ -741,4 +742,5 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   progressPct: { fontSize: 20, fontWeight: '800' },
   progressTrack: { height: 10, borderRadius: 5, backgroundColor: colors.border, overflow: 'hidden' },
   progressFill: { height: 10, borderRadius: 5 },
+  progressCaption: { fontSize: 10, color: colors.textSecondary, marginTop: 4 },
 });
