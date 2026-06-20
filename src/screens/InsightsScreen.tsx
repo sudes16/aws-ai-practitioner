@@ -38,6 +38,9 @@ const TREND_COUNT = 15;
 // in the domain, and scale by coverage so a tiny sample can't claim mastery.
 const MIN_DOMAIN_SAMPLE = 5;
 const DOMAIN_CONF_FLOOR = 0.5; // coverage at/above 50% = full confidence
+// Best Score only counts fully-completed sessions of at least this size so a
+// 1-of-1 perfect run can't claim 100%. Exams are 65 questions so they always qualify.
+const BEST_SCORE_MIN_QS = 30;
 
 const HIST_BUCKETS = [
   { label: '<50%',   min: 0,  max: 49  },
@@ -186,7 +189,10 @@ export default function InsightsScreen({ navigation }: Props) {
 
     const totalSessions = filteredHistory.length;
     const avgScore = totalSessions === 0 ? 0 : Math.round(filteredHistory.reduce((s, h) => s + h.pct, 0) / totalSessions);
-    const bestScore = totalSessions === 0 ? 0 : Math.max(...filteredHistory.map(h => h.pct));
+    // Best Score: only completed sessions of >=30 questions count (exams always qualify).
+    // Quit sessions are excluded since their pct is a partial-credit estimate, not a real score.
+    const bestEligible = filteredHistory.filter(h => !h.quit && (h.questionCount ?? 0) >= BEST_SCORE_MIN_QS);
+    const bestScore = bestEligible.length === 0 ? 0 : Math.max(...bestEligible.map(h => h.pct));
     const trendSessions = [...filteredHistory].slice(0, TREND_COUNT).reverse();
 
     // Per-domain stats derived from full session history (last 25 sessions).
@@ -337,6 +343,9 @@ export default function InsightsScreen({ navigation }: Props) {
               <View style={styles.summaryCard}>
                 <Text style={[styles.summaryValue, { color: bestScore >= 70 ? colors.correct : colors.awsOrange }]}>{bestScore}%</Text>
                 <Text style={styles.summaryLabel}>Best Score</Text>
+                <Text style={styles.summarySubLabel} numberOfLines={1}>
+                  {bestEligible.length === 0 ? `Needs ${BEST_SCORE_MIN_QS}+ Qs completed` : `from ${bestEligible.length} qualifying`}
+                </Text>
               </View>
             </View>
 
