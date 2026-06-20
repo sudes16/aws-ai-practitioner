@@ -1385,7 +1385,7 @@ export default function QuizScreen({ navigation, route }: Props) {
                 }
                 if (unanswered === 0) return 'Once submitted, you cannot change your answers.';
                 const hotspotNote = unansweredHotspots > 0
-                  ? ` (including ${unansweredHotspots} hotspot${unansweredHotspots !== 1 ? 's' : ''})`
+                  ? ` (including ${unansweredHotspots} matching question${unansweredHotspots !== 1 ? 's' : ''})`
                   : '';
                 return `You have ${unanswered} unanswered question${unanswered !== 1 ? 's' : ''}${hotspotNote}.\nUnanswered count as wrong.\nOnce submitted, you cannot change your answers.`;
               })()}

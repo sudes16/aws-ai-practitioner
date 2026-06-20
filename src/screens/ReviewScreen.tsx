@@ -185,7 +185,7 @@ export default function ReviewScreen({ navigation, route }: Props) {
         : item.correct === false
         ? 'Wrong'
         : isUngradedHotspot
-        ? 'Hotspot'
+        ? 'Matching'
         : 'Unanswered';
 
     return (
