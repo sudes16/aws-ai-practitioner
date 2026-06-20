@@ -201,7 +201,8 @@ export default function InsightsScreen({ navigation }: Props) {
     const domainStats: Record<number, { seen: Set<number>; correct: number; attempts: number }> = {};
     DOMAIN_NUMS.forEach(d => { domainStats[d] = { seen: new Set(), correct: 0, attempts: 0 }; });
     scopedRecords.forEach(r => r.history.forEach(h => {
-      if (h.isHotspot) return;
+      // Skip ungraded entries (unanswered, or unstructured hotspots without a checkable answer).
+      if (h.correct === null) return;
       if (!h.userLetters || h.userLetters.length === 0) return;
       const d = getDomainForIndex(h.questionIndex);
       domainStats[d].seen.add(h.questionIndex);

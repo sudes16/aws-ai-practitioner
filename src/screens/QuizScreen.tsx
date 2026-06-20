@@ -18,7 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { RootStackParamList, HistoryEntry, Question, OptionState } from '../constants/types';
-import { getAllQuestions, parseCorrectLetters, getDomainForIndex } from '../utils/quizEngine';
+import { getAllQuestions, parseCorrectLetters, getDomainForIndex, gradeQuestion } from '../utils/quizEngine';
 import { setExamResult } from '../utils/examResultStore';
 import {
   addQuestionReport,
@@ -288,15 +288,7 @@ export default function QuizScreen({ navigation, route }: Props) {
         const q = questions[qIdx];
         if (!q) continue;
         const userLetters = examDraftAnswers[i] ?? [];
-        const correctLettersList = q.answer ? parseCorrectLetters(q.answer, q.is_multi) : [];
-        const isCorrect: boolean | null = q.is_hotspot
-          ? null
-          : userLetters.length > 0 && correctLettersList.length > 0
-            ? q.is_multi
-              ? correctLettersList.length === userLetters.length &&
-                userLetters.every(l => correctLettersList.includes(l))
-              : userLetters[0] === correctLettersList[0]
-            : userLetters.length > 0 ? false : null;
+        const { correct: isCorrect, correctLetters: correctLettersList } = gradeQuestion(q, userLetters);
         h.push({
           questionNumber: q.number,
           questionIndex: qIdx,
@@ -338,15 +330,7 @@ export default function QuizScreen({ navigation, route }: Props) {
         const q = questions[qIdx];
         if (!q) continue;
         const userLetters = examDraftAnswers[i] ?? [];
-        const correctLettersList = q.answer ? parseCorrectLetters(q.answer, q.is_multi) : [];
-        const isCorrect: boolean | null = q.is_hotspot
-          ? null
-          : userLetters.length > 0 && correctLettersList.length > 0
-            ? q.is_multi
-              ? correctLettersList.length === userLetters.length &&
-                userLetters.every(l => correctLettersList.includes(l))
-              : userLetters[0] === correctLettersList[0]
-            : userLetters.length > 0 ? false : null;
+        const { correct: isCorrect, correctLetters: correctLettersList } = gradeQuestion(q, userLetters);
         h.push({
           questionNumber: q.number,
           questionIndex: qIdx,

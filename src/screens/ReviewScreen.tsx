@@ -58,7 +58,7 @@ export default function ReviewScreen({ navigation, route }: Props) {
     all: history.length,
     correct: history.filter(h => h.correct === true).length,
     wrong: history.filter(h => h.correct === false).length,
-    unanswered: history.filter(h => h.correct === null && !h.isHotspot).length,
+    unanswered: history.filter(h => h.correct === null && (h.userLetters?.length ?? 0) === 0).length,
     flagged: history.filter(h => h.flagged).length,
     noted: history.filter(h => !!notesMap[h.questionNumber]).length,
   }), [history, notesMap]);
@@ -158,32 +158,35 @@ export default function ReviewScreen({ navigation, route }: Props) {
     const q = questions[item.questionIndex];
     if (!q) return null;
 
-    const isUnanswered = !item.isHotspot && item.correct === null;
+    const isUnanswered = item.correct === null && (item.userLetters?.length ?? 0) === 0;
+    const isUngradedHotspot = item.isHotspot && item.correct === null && !isUnanswered;
 
     const statusColor =
-      item.isHotspot
-        ? colors.awsOrange
-        : isUnanswered
-        ? colors.textMuted
-        : item.correct === true
+      item.correct === true
         ? colors.correct
-        : colors.wrong;
+        : item.correct === false
+        ? colors.wrong
+        : isUngradedHotspot
+        ? colors.awsOrange
+        : colors.textMuted;
 
-    const statusIcon = item.isHotspot
-      ? '⚡'
-      : isUnanswered
-      ? '○'
-      : item.correct
-      ? '✓'
-      : '✗';
+    const statusIcon =
+      item.correct === true
+        ? '✓'
+        : item.correct === false
+        ? '✗'
+        : isUngradedHotspot
+        ? '⚡'
+        : '○';
 
-    const statusLabel = item.isHotspot
-      ? 'Hotspot'
-      : isUnanswered
-      ? 'Unanswered'
-      : item.correct
-      ? 'Correct'
-      : 'Wrong';
+    const statusLabel =
+      item.correct === true
+        ? 'Correct'
+        : item.correct === false
+        ? 'Wrong'
+        : isUngradedHotspot
+        ? 'Hotspot'
+        : 'Unanswered';
 
     return (
       <TouchableOpacity
@@ -208,10 +211,10 @@ export default function ReviewScreen({ navigation, route }: Props) {
             {q.question}
           </Text>
 
-          {!item.isHotspot && (
+          {!item.isHotspot || item.correct !== null ? (
             <View style={styles.answerRow}>
               <Text style={styles.answerLabel}>
-                Your answer:{' '}
+                {item.isHotspot ? 'Your order:' : 'Your answer:'}{' '}
                 <Text
                   style={[
                     styles.answerValue,
@@ -225,14 +228,14 @@ export default function ReviewScreen({ navigation, route }: Props) {
               </Text>
               {item.correct !== true && (
                 <Text style={styles.answerLabel}>
-                  {'  '}Correct:{' '}
+                  {'  '}{item.isHotspot ? 'Correct order:' : 'Correct:'}{' '}
                   <Text style={[styles.answerValue, { color: colors.correct }]}>
                     {item.correctLetters.join(', ')}
                   </Text>
                 </Text>
               )}
             </View>
-          )}
+          ) : null}
 
           {q.explanation ? (
             <Text style={styles.tapHint}>Tap for explanation →</Text>
@@ -254,7 +257,7 @@ export default function ReviewScreen({ navigation, route }: Props) {
       if (filterKey === 'all') return true;
       if (filterKey === 'correct') return entry.correct === true;
       if (filterKey === 'wrong') return entry.correct === false;
-      if (filterKey === 'unanswered') return entry.correct === null && !entry.isHotspot;
+      if (filterKey === 'unanswered') return entry.correct === null && (entry.userLetters?.length ?? 0) === 0;
       if (filterKey === 'flagged') return entry.flagged;
       if (filterKey === 'noted') return !!notesMap[entry.questionNumber];
       return true;

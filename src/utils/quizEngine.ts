@@ -144,6 +144,44 @@ export function parseCorrectLetters(answer: string | string[], isMulti: boolean)
   return [answer.toUpperCase().trim()];
 }
 
+/**
+ * Grades a question against a user's selections. Mirrors the rules used by
+ * QuizScreen practice-mode doSubmit so exam-mode submission stays consistent.
+ *  - MC single:    user[0] === correct[0]
+ *  - MC multi:     same set of letters (order ignored)
+ *  - Structured hotspot (has answer + options): element-wise sequence match
+ *  - Unstructured hotspot or unanswered: correct = null
+ */
+export function gradeQuestion(
+  q: Question,
+  userLetters: string[],
+): { correct: boolean | null; correctLetters: string[] } {
+  if (q.is_hotspot) {
+    const correctOrder = typeof q.answer === 'string' && q.answer
+      ? q.answer.split(',').map(s => s.trim().toUpperCase()).filter(Boolean)
+      : [];
+    if (correctOrder.length === 0 || !userLetters || userLetters.length === 0) {
+      return { correct: null, correctLetters: correctOrder };
+    }
+    const isCorrect =
+      correctOrder.length === userLetters.length &&
+      correctOrder.every((c, i) => c === (userLetters[i] ?? '').toUpperCase());
+    return { correct: isCorrect, correctLetters: correctOrder };
+  }
+  const correctLetters = q.answer ? parseCorrectLetters(q.answer, q.is_multi) : [];
+  if (!userLetters || userLetters.length === 0) {
+    return { correct: null, correctLetters };
+  }
+  if (correctLetters.length === 0) {
+    return { correct: false, correctLetters };
+  }
+  const isCorrect = q.is_multi
+    ? correctLetters.length === userLetters.length &&
+      userLetters.every(l => correctLetters.includes(l))
+    : userLetters[0] === correctLetters[0];
+  return { correct: isCorrect, correctLetters };
+}
+
 export function stripMarkdown(text: string): string {
   return text
     .replace(/\*\*(.*?)\*\*/g, '$1')       // bold
