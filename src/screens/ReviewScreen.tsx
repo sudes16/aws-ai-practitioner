@@ -288,6 +288,8 @@ export default function ReviewScreen({ navigation, route }: Props) {
         <TouchableOpacity
           style={styles.closeBtn}
           onPress={() => navigation.goBack()}
+          accessibilityLabel="Close review"
+          accessibilityRole="button"
         >
           <Text style={styles.closeBtnText}>✕</Text>
         </TouchableOpacity>

@@ -109,6 +109,8 @@ export default function PrivacyPolicyScreen({ navigation }: Props) {
         <TouchableOpacity
           style={styles.backBtn}
           onPress={() => navigation.goBack()}
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
         >
           <Text style={styles.backBtnText}>←</Text>
         </TouchableOpacity>
