@@ -153,6 +153,20 @@ export const clearScoreHistory = async (): Promise<void> => {
   }
 };
 
+export const removeScoreSession = async (dateIso: string): Promise<void> => {
+  try {
+    const raw = await AsyncStorage.getItem(SCORE_HISTORY_KEY);
+    if (!raw) return;
+    const existing: ScoreSession[] = JSON.parse(raw);
+    const next = existing.filter(s => s.date !== dateIso);
+    if (next.length === existing.length) return;
+    await AsyncStorage.setItem(SCORE_HISTORY_KEY, JSON.stringify(next));
+    bumpInsightsVersion();
+  } catch {
+    // silently fail
+  }
+};
+
 // ── Session Records (full history for post-session review) ─────────────────
 
 const SESSION_RECORDS_KEY = 'quiz_session_records';
@@ -196,6 +210,50 @@ export const clearSessionRecords = async (): Promise<void> => {
   try {
     await AsyncStorage.removeItem(SESSION_RECORDS_KEY);
     bumpInsightsVersion();
+  } catch {
+    // silently fail
+  }
+};
+
+/** Remove a single SessionRecord by matching ScoreSession.date within a 5-second window. */
+export const removeSessionRecordByDate = async (dateIso: string): Promise<void> => {
+  try {
+    const raw = await AsyncStorage.getItem(SESSION_RECORDS_KEY);
+    if (!raw) return;
+    const existing: SessionRecord[] = JSON.parse(raw);
+    const target = new Date(dateIso).getTime();
+    const next = existing.filter(r => Math.abs(new Date(r.date).getTime() - target) >= 5000);
+    if (next.length === existing.length) return;
+    await AsyncStorage.setItem(SESSION_RECORDS_KEY, JSON.stringify(next));
+    bumpInsightsVersion();
+  } catch {
+    // silently fail
+  }
+};
+
+// ── History screen view preferences (sort/filter/domain) ───────────────────
+
+const HISTORY_PREFS_KEY = 'history_view_prefs_v1';
+
+export interface HistoryViewPrefs {
+  sortKey: string;
+  filterKey: string;
+  domainKey: number;
+  rangeKey?: string;
+}
+
+export const getHistoryPrefs = async (): Promise<HistoryViewPrefs | null> => {
+  try {
+    const raw = await AsyncStorage.getItem(HISTORY_PREFS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+export const setHistoryPrefs = async (prefs: HistoryViewPrefs): Promise<void> => {
+  try {
+    await AsyncStorage.setItem(HISTORY_PREFS_KEY, JSON.stringify(prefs));
   } catch {
     // silently fail
   }

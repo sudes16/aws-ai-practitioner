@@ -115,10 +115,10 @@ const SECTIONS: Section[] = [
     title: 'Resetting Your Data',
     body:
       'You have granular control over what to reset in the Settings tab → Data & Progress:\n\n' +
-      '• Reset Mastered: Returns mastered questions to the active pool so they appear in Weak Mode again.\n' +
-      '• Reset Exam Rotation: Clears the record of questions used in past exams so the next exam picks from the full bank.\n' +
-      '• Reset Spaced Repetition: Clears the Smart Study schedule and starts fresh.\n' +
-      '• Reset All Data: Nuclear option — permanently deletes your profile, all score history and sessions, mastered/spaced repetition progress, exam rotation history, all notes and question reports, AI API key, and reminder settings. Your theme preference is kept. This cannot be undone.',
+      '• Reset mastered: Returns mastered questions to the active pool so they appear in Weak Mode again.\n' +
+      '• Reset exam rotation: Clears the record of questions used in past exams so the next exam picks from the full bank.\n' +
+      '• Reset spaced repetition: Clears the Smart Study schedule and starts fresh.\n' +
+      '• Reset all data: Nuclear option — permanently deletes your profile, all score history and sessions, mastered/spaced repetition progress, exam rotation history, all notes and question reports, AI API key, and reminder settings. Your theme preference is kept. This cannot be undone.',
   },
   {
     icon: '🚩',
@@ -157,7 +157,7 @@ export default function HelpScreen({ navigation }: Props) {
         >
           <Text style={styles.backBtnText}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>💡 How to Use</Text>
+        <Text style={styles.headerTitle}>💡 How to use</Text>
         <View style={{ width: 36 }} />
       </View>
 

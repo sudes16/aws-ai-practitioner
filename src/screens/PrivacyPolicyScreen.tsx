@@ -37,7 +37,7 @@ const SECTIONS: Section[] = [
       '• Profile — your name and target exam date\n' +
       '• Mastered questions — used to power Weak Mode tracking\n' +
       '• Study notes — per-question notes written during sessions\n' +
-      '• Study Reminder settings — your preferred notification time\n' +
+      '• Study reminder settings — your preferred notification time\n' +
       '• Exam rotation history — tracking questions seen in past simulations\n' +
       '• Gemini API Key — if provided by you to enable AI features\n\n' +
       'None of this data is ever transmitted to our servers. Your personal information remains exclusively on your device.',

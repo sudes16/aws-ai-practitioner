@@ -212,7 +212,7 @@ export default function SettingsScreen({ navigation }: Props) {
       'Your theme preference is kept. This cannot be undone.',
     ].join('\n');
     confirmAction(
-      'Reset ALL Data?',
+      'Reset all data?',
       lines,
       'Erase Everything',
       async () => {
@@ -500,7 +500,7 @@ export default function SettingsScreen({ navigation }: Props) {
           <View style={styles.row}>
             <Text style={styles.rowIcon}>✨</Text>
             <View style={{ flex: 1 }}>
-              <Text style={styles.rowLabel}>Gemini API Key</Text>
+              <Text style={styles.rowLabel}>Gemini API key</Text>
               <Text style={styles.rowSub}>Get a free key at <Text style={{ color: colors.awsOrange, textDecorationLine: 'underline' }} onPress={() => Linking.openURL(AI_STUDIO_URL)}>Google AI Studio</Text></Text>
             </View>
             <TouchableOpacity onPress={() => setShowAiKey(!showAiKey)}>
@@ -530,7 +530,7 @@ export default function SettingsScreen({ navigation }: Props) {
           <View style={styles.row}>
             <Text style={styles.rowIcon}>🔔</Text>
             <View style={{ flex: 1 }}>
-              <Text style={styles.rowLabel}>Study Reminder</Text>
+              <Text style={styles.rowLabel}>Study reminder</Text>
               <Text style={styles.rowSub}>Daily notification to keep your prep on track</Text>
             </View>
             <TouchableOpacity
@@ -604,7 +604,7 @@ export default function SettingsScreen({ navigation }: Props) {
         <View style={styles.card}>
           <TouchableOpacity style={styles.row} onPress={handleShare}>
             <Text style={styles.rowIcon}>📤</Text>
-            <Text style={styles.rowLabel}>Share App</Text>
+            <Text style={styles.rowLabel}>Share app</Text>
             <Text style={styles.rowChevron}>›</Text>
           </TouchableOpacity>
           <View style={styles.rowDivider} />
@@ -613,7 +613,7 @@ export default function SettingsScreen({ navigation }: Props) {
             onPress={() => Linking.openURL(PLAY_STORE_URL)}
           >
             <Text style={styles.rowIcon}>⭐</Text>
-            <Text style={styles.rowLabel}>Rate on Play Store</Text>
+            <Text style={styles.rowLabel}>Rate this app</Text>
             <Text style={styles.rowChevron}>›</Text>
           </TouchableOpacity>
           <View style={styles.rowDivider} />
@@ -622,7 +622,7 @@ export default function SettingsScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('Onboarding', { replay: true })}
           >
             <Text style={styles.rowIcon}>🗺️</Text>
-            <Text style={styles.rowLabel}>Replay App Tour</Text>
+            <Text style={styles.rowLabel}>Replay app tour</Text>
             <Text style={styles.rowChevron}>›</Text>
           </TouchableOpacity>
         </View>
@@ -690,7 +690,7 @@ export default function SettingsScreen({ navigation }: Props) {
             onPress={handleResetAllData}
             activeOpacity={0.85}
           >
-            <Text style={styles.dangerRowIcon}>⚠️</Text>
+            <Text style={styles.dangerRowIcon}>🗑️</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.dangerRowLabel}>Reset all data</Text>
               <Text style={styles.dangerRowSub}>Erase profile, progress, notes, AI key, and reminders</Text>
@@ -705,7 +705,7 @@ export default function SettingsScreen({ navigation }: Props) {
           <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('Reports')}>
             <Text style={styles.rowIcon}>⚠️</Text>
             <View style={{ flex: 1 }}>
-              <Text style={styles.rowLabel}>My Question Reports</Text>
+              <Text style={styles.rowLabel}>My question reports</Text>
               <Text style={styles.rowSub}>
                 {reportCount > 0
                   ? `${reportCount} flagged question${reportCount !== 1 ? 's' : ''}`
@@ -724,7 +724,7 @@ export default function SettingsScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('Help')}
           >
             <Text style={styles.rowIcon}>💡</Text>
-            <Text style={styles.rowLabel}>How to Use</Text>
+            <Text style={styles.rowLabel}>How to use</Text>
             <Text style={styles.rowChevron}>›</Text>
           </TouchableOpacity>
           <View style={styles.rowDivider} />
@@ -733,7 +733,7 @@ export default function SettingsScreen({ navigation }: Props) {
             onPress={() => Linking.openURL('https://d1.awsstatic.com/training-and-certification/docs-ai-practitioner/AWS-Certified-AI-Practitioner_Exam-Guide.pdf')}
           >
             <Text style={styles.rowIcon}>📚</Text>
-            <Text style={styles.rowLabel}>AWS Exam Guide</Text>
+            <Text style={styles.rowLabel}>AWS exam guide</Text>
             <Text style={styles.rowChevron}>›</Text>
           </TouchableOpacity>
         </View>
@@ -746,7 +746,7 @@ export default function SettingsScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('PrivacyPolicy')}
           >
             <Text style={styles.rowIcon}>🔒</Text>
-            <Text style={styles.rowLabel}>Privacy Policy</Text>
+            <Text style={styles.rowLabel}>Privacy policy</Text>
             <Text style={styles.rowChevron}>›</Text>
           </TouchableOpacity>
         </View>

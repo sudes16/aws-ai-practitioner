@@ -109,6 +109,10 @@ The rest are polish and can be deferred without user-visible risk.
 | E2 | Development | Decompose `HomeScreen.tsx` into smaller functional components | Open |
 | E8 | Feature | Session History Export/Import (JSON Backup) | Open |
 | E9 | Feature | Google Drive / Cloud Sync for study progress | Future |
+| E10 | Feature | History — date-range filter pill (Last 7 / 30 / 90 days / All time) on `SessionHistoryScreen`. Pairs with existing date-bucket grouping. | ✅ Done (2026-06-21) |
+| E11 | Feature | History — summary strip above control bar showing `total · passed · avg %` for the current tab/filter combo. Quick context without leaving the page. | ✅ Done (2026-06-21) |
+| E12 | Feature | History — mode filter pill (Random / Sequential / Weak / Smart Study / Exam). Adds a 5th pill so design must account for narrow screens (~360px). | Open |
+| E13 | UX | History — sticky control bar (count + Reset link + four pills) so filters stay visible on long lists. Wrap `<View style={styles.controlBar}>` in a sticky header. | Open |
 
 ---
 

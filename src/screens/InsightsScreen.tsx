@@ -43,6 +43,48 @@ const DOMAIN_CONF_FLOOR = 0.5; // coverage at/above 50% = full confidence
 // 1-of-1 perfect run can't claim 100%. Exams are 65 questions so they always qualify.
 const BEST_SCORE_MIN_QS = 30;
 
+// In-screen explainer popups for metrics whose rules aren't obvious from the UI
+// alone. Tapping a card opens the matching modal so users don't have to leave
+// Insights to figure out why a number looks the way it does.
+type MetricInfoKey = 'bestPractice' | 'bestExam' | 'bestScore' | 'readiness' | 'domain';
+const METRIC_INFO: Record<MetricInfoKey, { title: string; body: string }> = {
+  bestPractice: {
+    title: 'Best Practice',
+    body:
+      'Your highest score from a Practice session of at least 30 questions that you finished (not quit).\n\n' +
+      'Why 30? A perfect 5/5 doesn’t really prove mastery, so a meaningful sample is required before crowning a “best”. Quit sessions are excluded because their score is a partial-credit estimate, not a real result.',
+  },
+  bestExam: {
+    title: 'Best Exam',
+    body:
+      'Your highest score from a completed full-length Exam session.\n\n' +
+      'Exams are 65 questions, so they always meet the 30-question minimum that Best Practice requires. Quit exams are excluded.',
+  },
+  bestScore: {
+    title: 'Best Score',
+    body:
+      'Your highest score from any completed session of at least 30 questions in this tab. Practice and Exam scores are pooled together here.\n\n' +
+      'The 30-question minimum and “not quit” rule keep this metric honest — a 5/5 perfect run on a short practice won’t inflate the headline.',
+  },
+  readiness: {
+    title: 'Exam Readiness',
+    body:
+      'A weighted composite of three signals:\n\n' +
+      '• 50% from your Pass Rate\n' +
+      '• 30% from your recent average (last 3 sessions)\n' +
+      '• 20% from how much of the question bank you’ve answered\n\n' +
+      'The result is then multiplied by a confidence factor that scales from 0 up to 1 as your coverage reaches 50% of the bank. So if you’ve only answered 10% of questions, readiness is scaled down to 20% of its raw value — no matter how well you scored.\n\n' +
+      'This prevents a single great session from claiming “Exam-ready” before you’ve actually covered the material.',
+  },
+  domain: {
+    title: 'Domain Breakdown',
+    body:
+      'Per-domain accuracy across all your sessions in this tab.\n\n' +
+      'A domain is hidden until you’ve answered at least 5 questions in it. Once unlocked, the percentage is scaled down based on how much of the domain’s question bank you’ve covered — full credit only kicks in at 50% coverage.\n\n' +
+      'So 100% accuracy on 5 of 50 questions won’t show as 100% mastery. Coverage builds confidence over time, and the bar reflects that.',
+  },
+};
+
 const HIST_BUCKETS = [
   { label: '<50%',   min: 0,  max: 49  },
   { label: '50–59%', min: 50, max: 59  },
@@ -275,6 +317,7 @@ export default function InsightsScreen({ navigation }: Props) {
   );
   const [loading, setLoading] = useState(insightsCache === null);
   const [practiceTarget, setPracticeTarget] = useState<DomainFilter | null>(null);
+  const [infoMetric, setInfoMetric] = useState<MetricInfoKey | null>(null);
   const totalQCount = getTotalCount();
 
   const flatListRef = useRef<FlatList>(null);
@@ -430,29 +473,50 @@ export default function InsightsScreen({ navigation }: Props) {
               </View>
               {tabKey === 'all' ? (
                 <>
-                  <View style={styles.summaryCard}>
+                  <TouchableOpacity
+                    style={styles.summaryCard}
+                    onPress={() => setInfoMetric('bestPractice')}
+                    activeOpacity={0.7}
+                    accessibilityLabel="Best Practice score — tap for details"
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.cardInfoIcon}>ⓘ</Text>
                     <Text style={[styles.summaryValue, { color: bestPractice >= 70 ? colors.correct : colors.awsOrange }]}>{bestPractice}%</Text>
                     <Text style={styles.summaryLabel}>Best Practice</Text>
                     <Text style={styles.summarySubLabel} numberOfLines={1}>
                       {practiceBestEligible === 0 ? `Needs ${BEST_SCORE_MIN_QS}+ Qs` : `${practiceBestEligible} qualifying`}
                     </Text>
-                  </View>
-                  <View style={styles.summaryCard}>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.summaryCard}
+                    onPress={() => setInfoMetric('bestExam')}
+                    activeOpacity={0.7}
+                    accessibilityLabel="Best Exam score — tap for details"
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.cardInfoIcon}>ⓘ</Text>
                     <Text style={[styles.summaryValue, { color: bestExam >= 70 ? colors.correct : colors.awsOrange }]}>{bestExam}%</Text>
                     <Text style={styles.summaryLabel}>Best Exam</Text>
                     <Text style={styles.summarySubLabel} numberOfLines={1}>
                       {examBestEligible === 0 ? 'No exam yet' : `${examBestEligible} exam${examBestEligible === 1 ? '' : 's'}`}
                     </Text>
-                  </View>
+                  </TouchableOpacity>
                 </>
               ) : (
-                <View style={styles.summaryCard}>
+                <TouchableOpacity
+                  style={styles.summaryCard}
+                  onPress={() => setInfoMetric('bestScore')}
+                  activeOpacity={0.7}
+                  accessibilityLabel="Best Score — tap for details"
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.cardInfoIcon}>ⓘ</Text>
                   <Text style={[styles.summaryValue, { color: bestScore >= 70 ? colors.correct : colors.awsOrange }]}>{bestScore}%</Text>
                   <Text style={styles.summaryLabel}>Best Score</Text>
                   <Text style={styles.summarySubLabel} numberOfLines={1}>
                     {bestEligible === 0 ? `Needs ${BEST_SCORE_MIN_QS}+ Qs completed` : `from ${bestEligible} qualifying`}
                   </Text>
-                </View>
+                </TouchableOpacity>
               )}
             </View>
 
@@ -487,7 +551,14 @@ export default function InsightsScreen({ navigation }: Props) {
             )}
 
             <Text style={shared.sectionLabel}>EXAM READINESS</Text>
-            <View style={shared.card}>
+            <TouchableOpacity
+              style={shared.card}
+              onPress={() => setInfoMetric('readiness')}
+              activeOpacity={0.85}
+              accessibilityLabel="Exam Readiness — tap for details"
+              accessibilityRole="button"
+            >
+              <Text style={styles.cardInfoIcon}>ⓘ</Text>
               <View style={styles.readinessHeader}>
                 <Text style={[styles.readinessScore, { color: readinessColor }]}>{readinessScore}%</Text>
                 <Text style={[styles.readinessLabel, { color: readinessColor }]}>{readinessLabel}</Text>
@@ -501,7 +572,7 @@ export default function InsightsScreen({ navigation }: Props) {
               <Text style={styles.readinessHint}>
                 Calculated from {totalSessions} {totalSessions === 1 ? 'session' : 'sessions'} • {coveragePct}% answered{coveragePct < 50 ? ' (low — score is scaled down until you reach 50%)' : ''}.
               </Text>
-            </View>
+            </TouchableOpacity>
 
             <Text style={shared.sectionLabel}>SCORE TREND (LAST {trendSessions.length})</Text>
             <View style={[shared.card, { paddingLeft: 0, paddingRight: 0 }]}>
@@ -555,7 +626,17 @@ export default function InsightsScreen({ navigation }: Props) {
               ))}
             </View>
 
-            <Text style={shared.sectionLabel}>DOMAIN BREAKDOWN</Text>
+            <View style={styles.sectionLabelRow}>
+              <Text style={shared.sectionLabel}>DOMAIN BREAKDOWN</Text>
+              <TouchableOpacity
+                onPress={() => setInfoMetric('domain')}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityLabel="About Domain Breakdown"
+                accessibilityRole="button"
+              >
+                <Text style={styles.sectionInfoIcon}>ⓘ</Text>
+              </TouchableOpacity>
+            </View>
             <View style={shared.card}>
               {(() => {
                 const eligible = DOMAIN_NUMS.filter(d => domainStats[d].attempts >= MIN_DOMAIN_SAMPLE);
@@ -760,6 +841,35 @@ export default function InsightsScreen({ navigation }: Props) {
           </View>
         </View>
       </Modal>
+
+      {/* ── Metric Info Popup ─────────────────────────────────────────────── */}
+      <Modal
+        visible={infoMetric !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setInfoMetric(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>
+              {infoMetric ? METRIC_INFO[infoMetric].title : ''}
+            </Text>
+            <Text style={styles.modalBody}>
+              {infoMetric ? METRIC_INFO[infoMetric].body : ''}
+            </Text>
+            <View style={styles.modalBtns}>
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: colors.awsDark }]}
+                onPress={() => setInfoMetric(null)}
+                accessibilityLabel="Close"
+                accessibilityRole="button"
+              >
+                <Text style={styles.modalBtnPrimaryText}>Got it</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -827,12 +937,23 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' },
   modalBox: { width: '85%', backgroundColor: colors.cardBg, borderRadius: 14, padding: 20 },
   modalTitle: { fontSize: 17, fontWeight: '800', color: colors.textPrimary, marginBottom: 8 },
-  modalBody: { fontSize: 14, color: colors.textSecondary, marginBottom: 16 },
+  modalBody: { fontSize: 14, color: colors.textSecondary, marginBottom: 16, lineHeight: 20 },
   modalBtns: { flexDirection: 'row', gap: 10 },
   modalBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
   modalBtnSecondary: { backgroundColor: colors.border },
   modalBtnSecText: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
   modalBtnPrimaryText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+
+  // Subtle info hint shown in the top-right of tappable summary/insight cards.
+  // The whole card is the tap target; the icon is just a visual affordance.
+  // position:'absolute' keeps it out of flow so the value/label text below
+  // sits on the same baseline as non-tappable cards in the same row.
+  cardInfoIcon: {
+    position: 'absolute', top: 4, right: 6,
+    fontSize: 10, color: colors.textMuted, opacity: 0.6,
+  },
+  sectionLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  sectionInfoIcon: { fontSize: 14, color: colors.textSecondary, opacity: 0.85 },
   progressHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
   progressTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, flex: 1 },
   progressPct: { fontSize: 20, fontWeight: '800' },
