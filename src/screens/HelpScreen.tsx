@@ -85,6 +85,25 @@ const SECTIONS: Section[] = [
       'Pro Tip: After any session, use the "Retry Wrong" button on the Results screen to immediately drill into the questions you missed.',
   },
   {
+    icon: '📈',
+    title: 'Understanding Your Insights',
+    body:
+      'Every metric in the Insights tab has rules designed to keep your stats honest. Here\'s exactly what each one means:\n\n' +
+      '• Sessions: Total number of sessions in the selected tab (All / Practice / Exam) that had at least one answered question.\n\n' +
+      '• Avg Score: Mean percentage across all answered sessions in the tab.\n\n' +
+      '• Best Score: Only counts sessions of 30+ questions that you completed (didn\'t quit). A perfect 5/5 practice run won\'t qualify — this protects the metric from looking inflated by tiny samples. Exam sessions (65 Qs) always qualify.\n\n' +
+      '• Best Practice / Best Exam (All tab only): Splits the headline so a high practice score can\'t outrank a real exam score. Same 30+ question rule applies.\n\n' +
+      '• Pass Rate: Percentage of sessions where you scored 70% or higher (the AWS passing threshold).\n\n' +
+      '• Streak / Best: Consecutive days you\'ve had at least one session, alongside your all-time best streak. Uses your phone\'s local timezone.\n\n' +
+      '• Completed: Percentage of sessions you finished without quitting. Quit sessions still count toward Sessions and Avg Score (using partial credit), but not toward Best Score.\n\n' +
+      '• Exam Readiness: A weighted composite — 50% pass rate, 30% recent average (last 3 sessions), 20% answered coverage. Then multiplied by a confidence factor that scales from 0 up to 1 as your coverage reaches 50% of the question bank. So if you\'ve only answered 10% of questions, your readiness is scaled down to 20% of its raw value, no matter how well you scored. This stops a single great session from claiming "Exam-ready" prematurely.\n\n' +
+      '• Score Trend: Last 15 sessions in the tab, oldest on the left, newest on the right. The dashed green line is the 70% pass threshold.\n\n' +
+      '• Score Distribution: How your session scores cluster across five bands (<50%, 50–59%, 60–69%, 70–84%, 85%+).\n\n' +
+      '• Domain Breakdown: Per-domain accuracy. Hidden until you\'ve answered at least 5 questions in that domain. Once unlocked, the percentage is scaled down based on how much of the domain\'s question bank you\'ve covered — full credit only kicks in at 50% coverage. So 100% accuracy on 5 of 50 questions won\'t show as 100% mastery.\n\n' +
+      '• Mastery: Total questions you\'ve answered correctly 3 times in a row. Getting one wrong un-masters it automatically.\n\n' +
+      '• Answered Coverage: Unique questions you\'ve actually answered (not the same question counted multiple times). The denominator is the full question bank.',
+  },
+  {
     icon: '⭐',
     title: 'Mastered Questions',
     body:
