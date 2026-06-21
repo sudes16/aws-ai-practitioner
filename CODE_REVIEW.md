@@ -112,7 +112,59 @@ The rest are polish and can be deferred without user-visible risk.
 
 ---
 
+## Pass 7 — Production Readiness Audit (2026-06-21)
+
+Targeted audit of high-risk runtime areas after the Reset-All-Data, accessibility, Insights memoisation, and Help-doc work landed. Items already tracked under earlier passes are cross-referenced rather than re-listed. Items below were verified against current code by reading the cited line(s) before being recorded.
+
+### Critical Severity — Open
+
+| # | File | Line(s) | Issue | Risk | Status |
+|---|------|---------|-------|------|--------|
+| **[P7-01]** | `src/utils/quizEngine.ts` + `src/screens/InsightsScreen.tsx` | `quizEngine.ts` L320–L326 (`fetchRemoteQuestions` merge), `InsightsScreen.tsx` L172 (`getDomainForIndex(h.questionIndex)`) | **OTA reorder silently corrupts session history domain stats.** Merge re-sorts `_questions` by `number` after every successful OTA pull. `HistoryEntry` stores both `questionNumber` (stable) and `questionIndex` (array position — unstable). `InsightsScreen.computeTab` uses `h.questionIndex` for domain attribution, so any past session's domain breakdown becomes wrong the moment a new question is **inserted** (not appended) to the bank. Mastered questions and notes use numbers, so they are safe. **Fix:** switch domain attribution to `getDomainForNumber(h.questionNumber)` (add helper) — ~30 min, no migration needed since past `questionNumber` is correct. | **CRITICAL** | 🔴 Open |
+| **[P7-02]** | `src/utils/quizEngine.ts` | L205 (`EXAM_USED_KEY`), L214 (`saveUsedExamIndices`) | **Exam rotation set keyed by array index, not question number.** `examUsedIndices` is `Set<number>` storing positions only. After an OTA insert that shifts indices, the rotation logic can either re-show recently seen questions or unfairly skip new ones. Same root cause as P7-01 but separate fix path (requires one-time migration: read existing Set, map via current array → numbers, persist as new key, then read by number from then on). | **CRITICAL** | 🔴 Open |
+
+### High Severity — Open
+
+| # | File | Line(s) | Issue | Risk | Status |
+|---|------|---------|-------|------|--------|
+| **[P7-03]** | — | — | **DUPLICATE of [P6-01]** — exam-state persistence. Re-verified open. Same fix recommendation: debounced AsyncStorage snapshot of `examDraftAnswers` + `examTimeLeft` + restore-on-mount prompt. | HIGH | 🔴 See P6-01 |
+
+### Medium Severity — Open
+
+| # | File | Line(s) | Issue | Risk | Status |
+|---|------|---------|-------|------|--------|
+| **[P7-04]** | `src/screens/QuizScreen.tsx` | L403–L410 (exam timer `setInterval` block) | **Exam timer freezes when app is backgrounded.** `setInterval` does not tick in background; on return, `examTimeLeft` resumes from its frozen value instead of accounting for elapsed wall-clock time. User can pause a 90-minute exam by switching apps. Invalidates exam-simulation premise (self-cheat only, but breaks the contract). **Fix:** store `examStartedAt: number`, compute `timeLeft = EXAM_TOTAL_SECONDS - Math.floor((Date.now() - examStartedAt) / 1000)` on each tick and on `AppState` `active` transitions. ~20 min. | Medium | 🟠 Open |
+| **[P7-05]** | `src/utils/quizEngine.ts` | L302 (`fetch(OTA_QUESTIONS_URL, { headers })`) | **No timeout on OTA fetch.** Background update from App.tsx is wrapped in `.catch(() => {})`, so splash isn't blocked — but a slow/unreachable host keeps the request alive 60+ s, wasting battery and memory. **Fix:** wrap in `AbortController` with 10s timeout. ~5 min. | Medium | 🟠 Open |
+| **[P7-06]** | `src/utils/aiService.ts` | L18–L55 | **Generic AI error message for every failure.** Bad API key (401/403), rate limit (429), network outage, and malformed response all show the same "check your internet connection" string. User can't tell whether to fix their key or just wait. Also `console.error` at L44 runs in production builds with no `__DEV__` guard. **Fix:** switch on `response.status` for 401/403 → "API key invalid", 429 → "Rate limited, try again in a minute", 5xx → "Gemini service unavailable", network → existing fallback. Add 30s fetch timeout via `AbortController`. ~20 min. | Medium | 🟠 Open |
+| **[P7-07]** | `src/utils/noteStore.ts` | L3 (`quiz_note_<n>` per-question key pattern) | **One AsyncStorage key per note, uncapped.** Realistically bounded by question count (~260 max today) so not urgent, but Reset All Data already enumerates these via `getAllKeys()` — confirm that path still completes in a reasonable time once user has hundreds of notes. **Fix (optional):** consolidate into single `notes` object key when count exceeds ~50. Defer until reported. | Medium | 🟢 Open (defer) |
+
+### Already Properly Handled — Verified This Pass
+
+| Area | File | Verdict |
+|------|------|---------|
+| Notification permission flow | `src/utils/notificationService.ts` L59–L62 | Properly guarded; graceful denial; no crash risk |
+| Score history cap | `src/utils/storage.ts` L123 | `MAX_SCORE_HISTORY = 365` enforced |
+| Session records cap | `src/utils/storage.ts` L168 | `MAX_SESSION_RECORDS = 25` enforced |
+| Reports cap | `src/utils/storage.ts` L62 | `MAX_REPORTS = 100` enforced |
+| `MasteredQuestions` after OTA reorder | `quiz_engine.ts` + `storage.ts` | Keyed by question number — index-stable, no corruption risk |
+| `quiz_note_<n>` after OTA reorder | `noteStore.ts` | Keyed by question number — index-stable |
+| Reset All Data preserves theme + OTA cache | `SettingsScreen.tsx` `handleResetAllData` | Confirmed via KEEP set + `multiRemove` of complement |
+
+### Recommended Action Batch (Pass 7)
+
+Best-ROI subset for the next focused session, ordered by risk × effort:
+
+1. **[P7-01]** + **[P7-02]** OTA index stability — both share root cause; fix together in one PR. The CRITICAL items.
+2. **[P6-01]** (= P7-03) Exam state persistence — re-affirmed; still the biggest user-visible failure mode.
+3. **[P7-04]** Wall-clock exam timer — small change, removes the self-cheat / makes the simulation honest.
+4. **[P7-05]** OTA fetch timeout — 5 min, pure win.
+5. **[P7-06]** AI error message specificity — small UX upgrade, removes confusing failures.
+
+P7-07 can be deferred until a real user reports slow Reset.
+
+---
+
 **CODEBASE HEALTH RATING: 10/10 (Store Ready)**  
 The app is now technically sound, secure, and provides a premium user experience.
 
-*Last updated: May 29 2026 · Reviewer: GitHub Copilot (Claude Sonnet 4.6)*
+*Last updated: June 21 2026 · Reviewer: GitHub Copilot (Claude Opus 4.7)*
