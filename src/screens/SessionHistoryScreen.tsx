@@ -231,9 +231,7 @@ export default function SessionHistoryScreen({ navigation }: Props) {
   const [domainKey, setDomainKey]          = useState<DomainKey>(0);
   const [rangeKey, setRangeKey]            = useState<RangeKey>('all');
   const [sortPickerOpen, setSortPickerOpen]     = useState(false);
-  const [filterPickerOpen, setFilterPickerOpen] = useState(false);
-  const [domainPickerOpen, setDomainPickerOpen] = useState(false);
-  const [rangePickerOpen, setRangePickerOpen]   = useState(false);
+  const [filtersOpen, setFiltersOpen]           = useState(false);
   const { notesMap }                       = useNotes();
 
   // Tracks whether the persisted view prefs have been loaded. Prevents the
@@ -369,14 +367,10 @@ export default function SessionHistoryScreen({ navigation }: Props) {
     const isTabEmpty      = totalForTab === 0;
     const isFilterEmpty   = !isTabEmpty && finalList.length === 0;
     const userFiltersActive = filterKey !== 'all' || sortKey !== 'newest' || domainKey !== 0 || rangeKey !== 'all';
-
-    // Summary strip (tab-level, ignores user filters): gives a stable snapshot
-    // of "what's in this tab" regardless of how the user is currently slicing it.
-    const summaryPassed = tabFiltered.filter(s => s.pct >= PASS_THRESHOLD_PCT).length;
-    const summaryAvg    = totalForTab > 0
-      ? Math.round(tabFiltered.reduce((sum, s) => sum + s.pct, 0) / totalForTab)
-      : 0;
-    const summaryPassRate = totalForTab > 0 ? Math.round(summaryPassed / totalForTab * 100) : 0;
+    const activeFilterCount =
+      (filterKey !== 'all' ? 1 : 0) +
+      (domainKey !== 0 ? 1 : 0) +
+      (rangeKey !== 'all' ? 1 : 0);
 
     const renderRow = (s: ScoreSession, isFirst: boolean) => {
       const record = sessionRecords.find(r =>
@@ -444,14 +438,6 @@ export default function SessionHistoryScreen({ navigation }: Props) {
           </View>
         ) : (
           <>
-            {/* Summary strip: tab-level snapshot (stable across user filters). */}
-            <View style={styles.summaryStrip}>
-              <Text style={styles.summaryText}>
-                {totalForTab} {totalForTab === 1 ? 'session' : 'sessions'}
-                {totalForTab > 0 && ` · ${summaryPassed} passed (${summaryPassRate}%) · avg ${summaryAvg}%`}
-              </Text>
-            </View>
-
             {/* Control bar: count (+ Reset link when active) + sort/filter/domain/range pills */}
             <View style={styles.controlBar}>
               <View style={styles.controlLeft}>
@@ -484,36 +470,14 @@ export default function SessionHistoryScreen({ navigation }: Props) {
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.pill, filterKey !== 'all' && styles.pillActive]}
-                  onPress={() => setFilterPickerOpen(true)}
-                  accessibilityLabel={`Filter: ${FILTER_PILL_LABEL[filterKey]}. Tap to change.`}
+                  style={[styles.pill, activeFilterCount > 0 && styles.pillActive]}
+                  onPress={() => setFiltersOpen(true)}
+                  accessibilityLabel={`Filters${activeFilterCount > 0 ? `: ${activeFilterCount} active` : ''}. Tap to change.`}
                   accessibilityRole="button"
                 >
-                  <Text style={[styles.pillIcon, filterKey !== 'all' && styles.pillValueActive]}>☰</Text>
-                  <Text style={[styles.pillValue, filterKey !== 'all' && styles.pillValueActive]}>
-                    {FILTER_PILL_LABEL[filterKey]} ▾
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.pill, domainKey !== 0 && styles.pillActive]}
-                  onPress={() => setDomainPickerOpen(true)}
-                  accessibilityLabel={`Domain: ${DOMAIN_LABELS[domainKey]}. Tap to change.`}
-                  accessibilityRole="button"
-                >
-                  <Text style={[styles.pillIcon, domainKey !== 0 && styles.pillValueActive]}>⊞</Text>
-                  <Text style={[styles.pillValue, domainKey !== 0 && styles.pillValueActive]}>
-                    {DOMAIN_PILL_LABEL[domainKey]} ▾
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.pill, rangeKey !== 'all' && styles.pillActive]}
-                  onPress={() => setRangePickerOpen(true)}
-                  accessibilityLabel={`Date range: ${RANGE_PILL_LABEL[rangeKey]}. Tap to change.`}
-                  accessibilityRole="button"
-                >
-                  <Text style={[styles.pillIcon, rangeKey !== 'all' && styles.pillValueActive]}>⌛</Text>
-                  <Text style={[styles.pillValue, rangeKey !== 'all' && styles.pillValueActive]}>
-                    {RANGE_PILL_LABEL[rangeKey]} ▾
+                  <Text style={[styles.pillIcon, activeFilterCount > 0 && styles.pillValueActive]}>☰</Text>
+                  <Text style={[styles.pillValue, activeFilterCount > 0 && styles.pillValueActive]}>
+                    Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''} ▾
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -654,70 +618,92 @@ export default function SessionHistoryScreen({ navigation }: Props) {
         </TouchableOpacity>
       </Modal>
 
-      {/* ── Filter picker ───────────────────────────────────────────────── */}
+      {/* ── Combined Filters sheet ──────────────────────────────────────── */}
       <Modal
-        visible={filterPickerOpen}
+        visible={filtersOpen}
         transparent
         animationType="fade"
-        onRequestClose={() => setFilterPickerOpen(false)}
+        onRequestClose={() => setFiltersOpen(false)}
       >
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => setFilterPickerOpen(false)}
+          onPress={() => setFiltersOpen(false)}
         >
-          <View style={styles.modalBox} onStartShouldSetResponder={() => true}>
-            <Text style={styles.modalTitle}>Filter by status</Text>
-            {FILTER_OPTIONS.map(opt => {
-              const active = filterKey === opt.key;
-              return (
+          <View style={styles.sheetBox} onStartShouldSetResponder={() => true}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Filters</Text>
+              {(filterKey !== 'all' || domainKey !== 0 || rangeKey !== 'all') && (
                 <TouchableOpacity
-                  key={opt.key}
-                  style={[styles.modalOption, active && styles.modalOptionActive]}
-                  onPress={() => { setFilterKey(opt.key); setFilterPickerOpen(false); }}
+                  onPress={() => { setFilterKey('all'); setDomainKey(0); setRangeKey('all'); }}
+                  hitSlop={8}
                   accessibilityRole="button"
                 >
-                  <Text style={[styles.modalOptionText, active && styles.modalOptionTextActive]}>
-                    {opt.label}
-                  </Text>
-                  {active && <Text style={styles.modalOptionCheck}>✓</Text>}
+                  <Text style={styles.sheetReset}>↻ Reset</Text>
                 </TouchableOpacity>
-              );
-            })}
-          </View>
-        </TouchableOpacity>
-      </Modal>
+              )}
+            </View>
 
-      {/* ── Domain picker ───────────────────────────────────────────────── */}
-      <Modal
-        visible={domainPickerOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setDomainPickerOpen(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setDomainPickerOpen(false)}
-        >
-          <View style={styles.modalBox} onStartShouldSetResponder={() => true}>
-            <Text style={styles.modalTitle}>Filter by domain</Text>
-            {DOMAIN_OPTIONS.map(opt => {
-              const active = domainKey === opt.key;
-              return (
-                <TouchableOpacity
-                  key={opt.key}
-                  style={[styles.modalOption, active && styles.modalOptionActive]}
-                  onPress={() => { setDomainKey(opt.key); setDomainPickerOpen(false); }}
-                  accessibilityRole="button"
-                >
-                  <Text style={[styles.modalOptionText, active && styles.modalOptionTextActive]}>
-                    {opt.label}
-                  </Text>
-                  {active && <Text style={styles.modalOptionCheck}>✓</Text>}
-                </TouchableOpacity>
-              );
-            })}
+            <ScrollView style={styles.sheetScroll} showsVerticalScrollIndicator={false}>
+              <Text style={styles.sheetSection}>STATUS</Text>
+              <View style={styles.chipRow}>
+                {FILTER_OPTIONS.map(opt => {
+                  const active = filterKey === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[styles.chip, active && styles.chipActive]}
+                      onPress={() => setFilterKey(opt.key)}
+                      accessibilityRole="button"
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.sheetSection}>DOMAIN</Text>
+              <View style={styles.chipRow}>
+                {DOMAIN_OPTIONS.map(opt => {
+                  const active = domainKey === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[styles.chip, active && styles.chipActive]}
+                      onPress={() => setDomainKey(opt.key)}
+                      accessibilityRole="button"
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.sheetSection}>DATE RANGE</Text>
+              <View style={styles.chipRow}>
+                {RANGE_OPTIONS.map(opt => {
+                  const active = rangeKey === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[styles.chip, active && styles.chipActive]}
+                      onPress={() => setRangeKey(opt.key)}
+                      accessibilityRole="button"
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.sheetDoneBtn}
+              onPress={() => setFiltersOpen(false)}
+              accessibilityRole="button"
+            >
+              <Text style={styles.sheetDoneText}>Done</Text>
+            </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>
@@ -834,8 +820,6 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     flexShrink: 1,
     rowGap: 6,
   },
-  summaryStrip: { marginBottom: 8, paddingHorizontal: 2 },
-  summaryText:  { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -889,6 +873,57 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   modalOptionText:       { fontSize: 14, color: colors.textPrimary, fontWeight: '500' },
   modalOptionTextActive: { color: colors.awsOrange, fontWeight: '700' },
   modalOptionCheck:      { fontSize: 16, color: colors.awsOrange, fontWeight: '800' },
+
+  // ── Combined Filters sheet ───────────────────────────────────────────
+  sheetBox: {
+    width: '92%',
+    maxHeight: '85%',
+    backgroundColor: colors.cardBg,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  sheetTitle: { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
+  sheetReset: { color: colors.awsOrange, fontSize: 13, fontWeight: '700' },
+  sheetScroll: { marginBottom: 10 },
+  sheetSection: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  chipActive: {
+    borderColor: colors.awsOrange,
+    backgroundColor: 'rgba(255,153,0,0.10)',
+  },
+  chipText:       { color: colors.textPrimary, fontSize: 13, fontWeight: '600' },
+  chipTextActive: { color: colors.awsOrange, fontWeight: '700' },
+  sheetDoneBtn: {
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: colors.awsDark,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  sheetDoneText: { color: '#fff', fontSize: 14, fontWeight: '800' },
 
   // Date-bucket grouping (only when sort is date-based).
   groupSection: { marginBottom: 16 },
