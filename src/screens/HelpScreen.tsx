@@ -37,7 +37,7 @@ const SECTIONS: Section[] = [
       'The app features a fluid horizontal paging system:\n' +
       '• Home: Swipe between "Practice" and "Exam Simulation".\n' +
       '• Insights & History: Swipe between "All", "Practice", and "Exam" views.\n' +
-      '• Review: Swipe between "Correct", "Wrong", and "Flagged" questions.\n\n' +
+      '• Review: Swipe between "All", "Correct", "Wrong", "Unanswered", "Flagged", and "Noted" questions.\n\n' +
       'Navigating between tabs automatically resets the view to the top for a fresh start.',
   },
   {
@@ -81,7 +81,7 @@ const SECTIONS: Section[] = [
     icon: '📊',
     title: 'Advanced Progress Charts',
     body:
-      'Visit the Insights tab to see your learning curve on an animated line chart. Track your Score Distribution, Study Streaks, and Question Coverage (unseen vs seen) to ensure you are ready for exam day.\n\n' +
+      'Visit the Insights tab to see your learning curve on an animated line chart. Track your Score Distribution, Study Streaks, Mastery, and Answered Coverage (unique questions you\'ve engaged with) to ensure you are ready for exam day.\n\n' +
       'Pro Tip: After any session, use the "Retry Wrong" button on the Results screen to immediately drill into the questions you missed.',
   },
   {
@@ -89,7 +89,17 @@ const SECTIONS: Section[] = [
     title: 'Mastered Questions',
     body:
       'Mastered questions are removed from your Weak Mode pool. To keep your prep honest, if you get a mastered question wrong in a future session, the app will automatically un-master it for you.\n\n' +
-      'You can track your mastery progress in Insights and reset your progress at any time in the Settings tab.',
+      'You can track your mastery progress in Insights and reset individual categories (Mastered, Exam Rotation, Spaced Repetition) at any time in the Settings tab.',
+  },
+  {
+    icon: '🗑️',
+    title: 'Resetting Your Data',
+    body:
+      'You have granular control over what to reset in the Settings tab → Data & Progress:\n\n' +
+      '• Reset Mastered: Returns mastered questions to the active pool so they appear in Weak Mode again.\n' +
+      '• Reset Exam Rotation: Clears the record of questions used in past exams so the next exam picks from the full bank.\n' +
+      '• Reset Spaced Repetition: Clears the Smart Study schedule and starts fresh.\n' +
+      '• Reset All Data: Nuclear option — permanently deletes your profile, all score history and sessions, mastered/spaced repetition progress, exam rotation history, all notes and question reports, AI API key, and reminder settings. Your theme preference is kept. This cannot be undone.',
   },
   {
     icon: '🚩',
