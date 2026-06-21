@@ -16,7 +16,8 @@ export default function App() {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    const MIN_STAGE2_MS = 900; // ensure the tagline UI is readable
+    const MIN_STAGE1_MS = 1000; // minimum time the native splash stays up
+    const MIN_STAGE2_MS = 1500; // minimum time the tagline/logo UI is visible
     const startedAt = Date.now();
 
     async function loadData() {
@@ -26,12 +27,13 @@ export default function App() {
       } catch (e) {
         console.warn('Load Error:', e);
       } finally {
-        // Reveal the Stage 2 UI immediately by hiding the native splash,
-        // then wait so the logo + tagline are visible for at least MIN_STAGE2_MS.
-        SplashScreen.hideAsync().catch(() => {});
-        const elapsed = Date.now() - startedAt;
-        const remaining = Math.max(0, MIN_STAGE2_MS - elapsed);
-        setTimeout(() => setIsReady(true), remaining);
+        // Hold the native splash until at least MIN_STAGE1_MS has elapsed, then
+        // hand off to the React-rendered Stage 2 UI for at least MIN_STAGE2_MS.
+        const stage1Remaining = Math.max(0, MIN_STAGE1_MS - (Date.now() - startedAt));
+        setTimeout(() => {
+          SplashScreen.hideAsync().catch(() => {});
+          setTimeout(() => setIsReady(true), MIN_STAGE2_MS);
+        }, stage1Remaining);
       }
     }
 
