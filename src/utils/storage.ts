@@ -233,19 +233,36 @@ export const removeSessionRecordByDate = async (dateIso: string): Promise<void> 
 
 // ── History screen view preferences (sort/filter/domain) ───────────────────
 
-const HISTORY_PREFS_KEY = 'history_view_prefs_v1';
+const HISTORY_PREFS_KEY    = 'history_view_prefs_v2';
+const HISTORY_PREFS_V1_KEY = 'history_view_prefs_v1';
 
-export interface HistoryViewPrefs {
+export interface HistoryTabPrefs {
   sortKey: string;
   filterKey: string;
   domainKey: number;
-  rangeKey?: string;
+  rangeKey: string;
 }
+
+// Map of TabKey ('all' | 'practice' | 'exam') -> per-tab prefs.
+export type HistoryViewPrefs = Record<string, HistoryTabPrefs>;
 
 export const getHistoryPrefs = async (): Promise<HistoryViewPrefs | null> => {
   try {
     const raw = await AsyncStorage.getItem(HISTORY_PREFS_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (raw) return JSON.parse(raw);
+    // Migration: v1 was a single shared prefs object — seed all three tabs from it.
+    const rawV1 = await AsyncStorage.getItem(HISTORY_PREFS_V1_KEY);
+    if (rawV1) {
+      const p = JSON.parse(rawV1);
+      const seed: HistoryTabPrefs = {
+        sortKey:   typeof p.sortKey   === 'string' ? p.sortKey   : 'newest',
+        filterKey: typeof p.filterKey === 'string' ? p.filterKey : 'all',
+        domainKey: typeof p.domainKey === 'number' ? p.domainKey : 0,
+        rangeKey:  typeof p.rangeKey  === 'string' ? p.rangeKey  : 'all',
+      };
+      return { all: { ...seed }, practice: { ...seed }, exam: { ...seed } };
+    }
+    return null;
   } catch {
     return null;
   }

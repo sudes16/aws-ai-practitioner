@@ -135,7 +135,7 @@ export default function ResultScreen({ navigation, route }: Props) {
     addScoreSession({
       date: new Date().toISOString(),
       mode: 'quiz',
-      domain: 0,
+      domain: config?.domain ?? 0,
       questionCount: total,
       answeredCount,
       score,

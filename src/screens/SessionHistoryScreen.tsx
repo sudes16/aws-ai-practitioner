@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -226,12 +227,36 @@ export default function SessionHistoryScreen({ navigation }: Props) {
   const [scoreHistory, setScoreHistory]   = useState<ScoreSession[]>([]);
   const [sessionRecords, setSessionRecords] = useState<SessionRecord[]>([]);
   const [activeTab, setActiveTab]          = useState<TabKey>('all');
-  const [sortKey, setSortKey]              = useState<SortKey>('newest');
-  const [filterKey, setFilterKey]          = useState<FilterKey>('all');
-  const [domainKey, setDomainKey]          = useState<DomainKey>(0);
-  const [rangeKey, setRangeKey]            = useState<RangeKey>('all');
+
+  // Per-tab Sort + Filters. Each tab (All / Practice / Exam) keeps its own state
+  // so switching tabs restores that tab's view (e.g. Domain filter on Practice
+  // doesn't follow you to Exam where it would always show 0 results).
+  type TabPrefs = { sortKey: SortKey; filterKey: FilterKey; domainKey: DomainKey; rangeKey: RangeKey };
+  const DEFAULT_TAB_PREFS: TabPrefs = { sortKey: 'newest', filterKey: 'all', domainKey: 0, rangeKey: 'all' };
+  const [tabPrefs, setTabPrefs] = useState<Record<TabKey, TabPrefs>>({
+    all:      { ...DEFAULT_TAB_PREFS },
+    practice: { ...DEFAULT_TAB_PREFS },
+    exam:     { ...DEFAULT_TAB_PREFS },
+  });
+
+  const { sortKey, filterKey, domainKey, rangeKey } = tabPrefs[activeTab];
+  const setSortKey   = (k: SortKey)   => setTabPrefs(p => ({ ...p, [activeTab]: { ...p[activeTab], sortKey:   k } }));
+  const setFilterKey = (k: FilterKey) => setTabPrefs(p => ({ ...p, [activeTab]: { ...p[activeTab], filterKey: k } }));
+  const setDomainKey = (k: DomainKey) => setTabPrefs(p => ({ ...p, [activeTab]: { ...p[activeTab], domainKey: k } }));
+  const setRangeKey  = (k: RangeKey)  => setTabPrefs(p => ({ ...p, [activeTab]: { ...p[activeTab], rangeKey:  k } }));
+
   const [sortPickerOpen, setSortPickerOpen]     = useState(false);
   const [filtersOpen, setFiltersOpen]           = useState(false);
+  // Multi-select state for bulk delete. selection holds the ISO `date` strings
+  // of selected sessions; select mode is active whenever the set is non-empty.
+  const [selection, setSelection] = useState<Set<string>>(new Set());
+  const isSelectMode = selection.size > 0;
+  const toggleSelect = (date: string) => setSelection(prev => {
+    const next = new Set(prev);
+    if (next.has(date)) next.delete(date); else next.add(date);
+    return next;
+  });
+  const clearSelection = () => setSelection(new Set());
   const { notesMap }                       = useNotes();
 
   // Tracks whether the persisted view prefs have been loaded. Prevents the
@@ -243,14 +268,21 @@ export default function SessionHistoryScreen({ navigation }: Props) {
     getHistoryPrefs().then(p => {
       if (cancelled) return;
       if (p) {
-        if (SORT_KEY_SET.has(p.sortKey as SortKey))     setSortKey(p.sortKey as SortKey);
-        if (FILTER_KEY_SET.has(p.filterKey as FilterKey)) setFilterKey(p.filterKey as FilterKey);
-        if (typeof p.domainKey === 'number' && p.domainKey >= 0 && p.domainKey <= 5) {
-          setDomainKey(p.domainKey as DomainKey);
-        }
-        if (p.rangeKey && RANGE_KEY_SET.has(p.rangeKey as RangeKey)) {
-          setRangeKey(p.rangeKey as RangeKey);
-        }
+        setTabPrefs(prev => {
+          const next = { ...prev };
+          (['all', 'practice', 'exam'] as TabKey[]).forEach(tab => {
+            const t = p[tab];
+            if (!t) return;
+            next[tab] = {
+              sortKey:   SORT_KEY_SET.has(t.sortKey as SortKey)       ? (t.sortKey as SortKey)     : 'newest',
+              filterKey: FILTER_KEY_SET.has(t.filterKey as FilterKey) ? (t.filterKey as FilterKey) : 'all',
+              domainKey: (typeof t.domainKey === 'number' && t.domainKey >= 0 && t.domainKey <= 5)
+                ? (t.domainKey as DomainKey) : 0,
+              rangeKey:  t.rangeKey && RANGE_KEY_SET.has(t.rangeKey as RangeKey) ? (t.rangeKey as RangeKey) : 'all',
+            };
+          });
+          return next;
+        });
       }
       prefsLoadedRef.current = true;
     });
@@ -259,8 +291,8 @@ export default function SessionHistoryScreen({ navigation }: Props) {
 
   useEffect(() => {
     if (!prefsLoadedRef.current) return;
-    setHistoryPrefs({ sortKey, filterKey, domainKey, rangeKey });
-  }, [sortKey, filterKey, domainKey, rangeKey]);
+    setHistoryPrefs(tabPrefs);
+  }, [tabPrefs]);
 
   const flatListRef = useRef<FlatList>(null);
   const isInternalScroll = useRef(false);
@@ -325,28 +357,52 @@ export default function SessionHistoryScreen({ navigation }: Props) {
   };
 
   const handleDeleteSession = (s: ScoreSession) => {
+    // Long-press now enters select mode with this row pre-selected; user can
+    // tap more rows to add, then tap the toolbar Delete to confirm in bulk.
+    setSelection(new Set([s.date]));
+  };
+
+  const handleBulkDelete = () => {
+    const count = selection.size;
+    if (count === 0) return;
+    const dates = Array.from(selection);
+    const times = dates.map(d => new Date(d).getTime());
     const doDelete = async () => {
-      await Promise.all([
-        removeScoreSession(s.date),
-        removeSessionRecordByDate(s.date),
-      ]);
-      const t = new Date(s.date).getTime();
-      setScoreHistory(prev => prev.filter(x => x.date !== s.date));
-      setSessionRecords(prev => prev.filter(r => Math.abs(new Date(r.date).getTime() - t) >= 5000));
+      await Promise.all(dates.flatMap(d => [
+        removeScoreSession(d),
+        removeSessionRecordByDate(d),
+      ]));
+      setScoreHistory(prev => prev.filter(x => !selection.has(x.date)));
+      setSessionRecords(prev => prev.filter(r => {
+        const rt = new Date(r.date).getTime();
+        return !times.some(t => Math.abs(rt - t) < 5000);
+      }));
+      clearSelection();
     };
+    const title = `Delete ${count} session${count === 1 ? '' : 's'}?`;
+    const body  = `This will permanently remove ${count === 1 ? 'it' : 'them'} from history.`;
     if (Platform.OS === 'web') {
-      if (window.confirm('Delete this session?\n\nThis will permanently remove it from history.')) doDelete();
+      if (window.confirm(`${title}\n\n${body}`)) doDelete();
     } else {
-      Alert.alert(
-        'Delete this session?',
-        'This will permanently remove it from history.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Delete', style: 'destructive', onPress: doDelete },
-        ],
-      );
+      Alert.alert(title, body, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: doDelete },
+      ]);
     }
   };
+
+  // Switching tabs exits select mode (selection is scoped to the visible list).
+  useEffect(() => { setSelection(new Set()); }, [activeTab]);
+
+  // Android hardware back: exit select mode instead of leaving the screen.
+  useEffect(() => {
+    if (!isSelectMode) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      setSelection(new Set());
+      return true;
+    });
+    return () => sub.remove();
+  }, [isSelectMode]);
 
   const renderPage = ({ item }: { item: TabKey }) => {
     const tabKey = item;
@@ -379,23 +435,35 @@ export default function SessionHistoryScreen({ navigation }: Props) {
       const elapsed = record?.elapsedSeconds;
       const descriptor = buildSessionDescriptor(s, elapsed);
       const passed = s.pct >= PASS_THRESHOLD_PCT;
+      const isSelected = selection.has(s.date);
       return (
         <View key={s.date}>
           {!isFirst && <View style={styles.divider} />}
           <TouchableOpacity
-            style={styles.historyRow}
-            onPress={record ? () => navigation.navigate('Review', {
-                history: record.history,
-                date: s.date,
-                mode: s.mode,
-                total: s.questionCount,
-                pct: s.pct,
-                quit: s.quit,
-              }) : undefined}
-            onLongPress={() => handleDeleteSession(s)}
+            style={[styles.historyRow, isSelected && styles.historyRowSelected]}
+            onPress={() => {
+              if (isSelectMode) {
+                toggleSelect(s.date);
+              } else if (record) {
+                navigation.navigate('Review', {
+                  history: record.history,
+                  date: s.date,
+                  mode: s.mode,
+                  total: s.questionCount,
+                  pct: s.pct,
+                  quit: s.quit,
+                });
+              }
+            }}
+            onLongPress={isSelectMode ? undefined : () => handleDeleteSession(s)}
             delayLongPress={400}
-            activeOpacity={record ? 0.7 : 1}
+            activeOpacity={isSelectMode || record ? 0.7 : 1}
           >
+            {isSelectMode && (
+              <View style={[styles.selectCircle, isSelected && styles.selectCircleActive]}>
+                {isSelected && <Text style={styles.selectCircleCheck}>✓</Text>}
+              </View>
+            )}
             <View style={styles.historyLeft}>
               <Text style={styles.historyDate} numberOfLines={1}>
                 {formatSessionTimestamp(s.date)}
@@ -407,7 +475,7 @@ export default function SessionHistoryScreen({ navigation }: Props) {
             <Text style={[styles.historyPct, { color: passed ? colors.correct : colors.wrong }]}>
               {s.pct}%
             </Text>
-            {record && <Text style={styles.historyChevron}>›</Text>}
+            {!isSelectMode && record && <Text style={styles.historyChevron}>›</Text>}
           </TouchableOpacity>
         </View>
       );
@@ -438,50 +506,65 @@ export default function SessionHistoryScreen({ navigation }: Props) {
           </View>
         ) : (
           <>
-            {/* Control bar: count (+ Reset link when active) + sort/filter/domain/range pills */}
-            <View style={styles.controlBar}>
-              <View style={styles.controlLeft}>
-                <Text style={styles.controlCount}>
-                  {finalList.length === totalForTab
-                    ? `${totalForTab} session${totalForTab === 1 ? '' : 's'}`
-                    : `${finalList.length} of ${totalForTab}`}
-                </Text>
-                {userFiltersActive && (
+            {/* Control bar: count (+ Reset link when active) + sort/filter/domain/range pills.
+                In select mode, swap to a Cancel | N selected | Delete toolbar. */}
+            {isSelectMode ? (
+              <View style={[styles.controlBar, { alignItems: 'center' }]}>
+                <TouchableOpacity onPress={clearSelection} hitSlop={8} accessibilityRole="button" accessibilityLabel="Cancel selection">
+                  <Text style={styles.selectToolbarCancel}>← Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.selectToolbarCount}>{selection.size} selected</Text>
+                <TouchableOpacity onPress={handleBulkDelete} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Delete ${selection.size} selected sessions`}>
+                  <Text style={styles.selectToolbarDelete}>🗑 Delete ({selection.size})</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.controlBar}>
+                <View style={styles.controlLeft}>
+                  <Text style={styles.controlCount}>
+                    {finalList.length === totalForTab
+                      ? `${totalForTab} session${totalForTab === 1 ? '' : 's'}`
+                      : `${finalList.length} of ${totalForTab}`}
+                  </Text>
+                  {userFiltersActive && (
+                    <TouchableOpacity
+                      onPress={() => { setSortKey('newest'); setFilterKey('all'); setDomainKey(0); setRangeKey('all'); }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Reset all filters"
+                      hitSlop={8}
+                    >
+                      <Text style={styles.controlReset}>↻ Reset</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <View style={styles.controlPills}>
                   <TouchableOpacity
-                    onPress={() => { setSortKey('newest'); setFilterKey('all'); setDomainKey(0); setRangeKey('all'); }}
+                    style={[styles.pill, sortKey !== 'newest' && styles.pillActive]}
+                    onPress={() => setSortPickerOpen(true)}
+                    accessibilityLabel={`Sort: ${SORT_PILL_LABEL[sortKey]}. Tap to change.`}
                     accessibilityRole="button"
-                    accessibilityLabel="Reset all filters"
-                    hitSlop={8}
                   >
-                    <Text style={styles.controlReset}>↻ Reset</Text>
+                    <Text style={[styles.pillIcon, sortKey !== 'newest' && styles.pillValueActive]}>⇅</Text>
+                    {sortKey !== 'newest' && (
+                      <Text style={[styles.pillValue, styles.pillValueActive]}>{SORT_PILL_LABEL[sortKey]}</Text>
+                    )}
+                    <Text style={[styles.pillValue, sortKey !== 'newest' && styles.pillValueActive]}>▾</Text>
                   </TouchableOpacity>
-                )}
+                  <TouchableOpacity
+                    style={[styles.pill, activeFilterCount > 0 && styles.pillActive]}
+                    onPress={() => setFiltersOpen(true)}
+                    accessibilityLabel={`Filters${activeFilterCount > 0 ? `: ${activeFilterCount} active` : ''}. Tap to change.`}
+                    accessibilityRole="button"
+                  >
+                    <Text style={[styles.pillIcon, activeFilterCount > 0 && styles.pillValueActive]}>☰</Text>
+                    {activeFilterCount > 0 && (
+                      <Text style={[styles.pillValue, styles.pillValueActive]}>({activeFilterCount})</Text>
+                    )}
+                    <Text style={[styles.pillValue, activeFilterCount > 0 && styles.pillValueActive]}>▾</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-              <View style={styles.controlPills}>
-                <TouchableOpacity
-                  style={[styles.pill, sortKey !== 'newest' && styles.pillActive]}
-                  onPress={() => setSortPickerOpen(true)}
-                  accessibilityLabel={`Sort: ${SORT_PILL_LABEL[sortKey]}. Tap to change.`}
-                  accessibilityRole="button"
-                >
-                  <Text style={[styles.pillIcon, sortKey !== 'newest' && styles.pillValueActive]}>⇅</Text>
-                  <Text style={[styles.pillValue, sortKey !== 'newest' && styles.pillValueActive]}>
-                    {SORT_PILL_LABEL[sortKey]} ▾
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.pill, activeFilterCount > 0 && styles.pillActive]}
-                  onPress={() => setFiltersOpen(true)}
-                  accessibilityLabel={`Filters${activeFilterCount > 0 ? `: ${activeFilterCount} active` : ''}. Tap to change.`}
-                  accessibilityRole="button"
-                >
-                  <Text style={[styles.pillIcon, activeFilterCount > 0 && styles.pillValueActive]}>☰</Text>
-                  <Text style={[styles.pillValue, activeFilterCount > 0 && styles.pillValueActive]}>
-                    Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''} ▾
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+            )}
 
             {isFilterEmpty ? (
               <View style={styles.emptyCard}>
@@ -662,22 +745,26 @@ export default function SessionHistoryScreen({ navigation }: Props) {
                 })}
               </View>
 
-              <Text style={styles.sheetSection}>DOMAIN</Text>
-              <View style={styles.chipRow}>
-                {DOMAIN_OPTIONS.map(opt => {
-                  const active = domainKey === opt.key;
-                  return (
-                    <TouchableOpacity
-                      key={opt.key}
-                      style={[styles.chip, active && styles.chipActive]}
-                      onPress={() => setDomainKey(opt.key)}
-                      accessibilityRole="button"
-                    >
-                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{opt.label}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+              {activeTab !== 'exam' && (
+                <>
+                  <Text style={styles.sheetSection}>DOMAIN</Text>
+                  <View style={styles.chipRow}>
+                    {DOMAIN_OPTIONS.map(opt => {
+                      const active = domainKey === opt.key;
+                      return (
+                        <TouchableOpacity
+                          key={opt.key}
+                          style={[styles.chip, active && styles.chipActive]}
+                          onPress={() => setDomainKey(opt.key)}
+                          accessibilityRole="button"
+                        >
+                          <Text style={[styles.chipText, active && styles.chipTextActive]}>{opt.label}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
 
               <Text style={styles.sheetSection}>DATE RANGE</Text>
               <View style={styles.chipRow}>
@@ -789,7 +876,28 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   historySubtitle: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
   historyPct:      { fontSize: 16, fontWeight: '800', minWidth: 46, textAlign: 'right' },
   historyChevron:  { color: colors.textSecondary, fontSize: 20, marginLeft: 4 },
+  historyRowSelected: { backgroundColor: 'rgba(255,153,0,0.10)' },
   noteBadge: { fontSize: 14, color: colors.awsOrange, marginRight: 4 },
+
+  // Multi-select bulk-delete UI
+  selectCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: colors.textSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 4,
+  },
+  selectCircleActive: {
+    backgroundColor: colors.awsOrange,
+    borderColor: colors.awsOrange,
+  },
+  selectCircleCheck: { color: '#FFFFFF', fontSize: 13, fontWeight: '800', lineHeight: 14 },
+  selectToolbarCancel: { color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
+  selectToolbarCount:  { color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
+  selectToolbarDelete: { color: colors.wrong, fontSize: 14, fontWeight: '700' },
 
   clearRow: {
     flexDirection: 'row',

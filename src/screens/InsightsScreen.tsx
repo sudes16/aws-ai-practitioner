@@ -79,9 +79,17 @@ const METRIC_INFO: Record<MetricInfoKey, { title: string; body: string }> = {
   domain: {
     title: 'Domain Breakdown',
     body:
-      'Per-domain accuracy across all your sessions in this tab.\n\n' +
-      'A domain is hidden until you’ve answered at least 5 questions in it. Once unlocked, the percentage is scaled down based on how much of the domain’s question bank you’ve covered — full credit only kicks in at 50% coverage.\n\n' +
-      'So 100% accuracy on 5 of 50 questions won’t show as 100% mastery. Coverage builds confidence over time, and the bar reflects that.',
+      'Each row shows two things:\n' +
+      '• X / Y questions tried — unique questions you have answered (X), out of Y total in this domain.\n' +
+      '• C correct in A attempts — A counts every answer click (the same question answered in two sessions = 2 attempts). C is how many of those were correct.\n\n' +
+      'The percentage badge = accuracy × confidence\n' +
+      '  accuracy   = correct / attempts\n' +
+      '  confidence = min(1, coverage ÷ 50%)\n' +
+      '  coverage   = unique tried / total in domain\n\n' +
+      'Example: 6 correct in 17 attempts, 13 / 86 covered\n' +
+      '  35% accuracy × 0.30 confidence ≈ 11%\n\n' +
+      'This stops a lucky 5-question sample from looking like mastery. Cover ≥ 50% of the bank and the score equals raw accuracy.\n\n' +
+      'A domain stays hidden until it has at least 5 attempts.',
   },
 };
 
@@ -686,7 +694,7 @@ export default function InsightsScreen({ navigation }: Props) {
                       <View style={[styles.domainBarFill, { width: pct !== null ? `${pct}%` as any : '0%', backgroundColor: barColor }]} />
                     </View>
                     <Text style={styles.domainSubtitle}>
-                      {dStats.seenSize} of {bankTotal} answered • {dStats.correct}/{dStats.attempts} correct
+                      {dStats.seenSize} / {bankTotal} questions tried | {dStats.correct} correct in {dStats.attempts} attempts
                     </Text>
                     <TouchableOpacity
                       style={styles.domainPracticeBtn}

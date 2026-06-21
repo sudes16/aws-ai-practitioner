@@ -294,11 +294,18 @@ export default function ReviewScreen({ navigation, route }: Props) {
           <Text style={styles.closeBtnText}>✕</Text>
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {date
-              ? (mode === 'exam' ? '🎓 Exam Session' : '📝 Practice Session')
-              : 'Review Answers'}
-          </Text>
+          <View style={styles.headerTitleRow}>
+            {date && (
+              <Text style={styles.headerTitleEmoji}>
+                {mode === 'exam' ? '🎓' : '📝'}
+              </Text>
+            )}
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              {date
+                ? (mode === 'exam' ? 'Exam Session' : 'Practice Session')
+                : 'Review Answers'}
+            </Text>
+          </View>
           {date && (
             <Text style={styles.headerContextSub} numberOfLines={1}>
               {formatDate(date)}{total !== undefined ? ` | ${total}Q` : ''}{pct !== undefined ? ` | ${pct}%` : ''}{quit ? ' (quit)' : ''}
@@ -423,11 +430,24 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     flex: 1,
     alignItems: 'center',
   },
+  // Title row keeps the emoji and label apart by a fixed gap so visual spacing
+  // stays consistent across glyphs (e.g. 🎓 has less built-in whitespace than 📝).
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    maxWidth: '100%',
+  },
+  headerTitleEmoji: {
+    fontSize: 15,
+    lineHeight: 18,
+  },
   headerTitle: {
     fontSize: 18,
     fontWeight: '800',
     color: colors.textLight,
     textAlign: 'center',
+    flexShrink: 1,
   },
   headerContextSub: {
     fontSize: 11,
