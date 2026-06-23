@@ -902,7 +902,7 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
   summaryCard: { flex: 1, backgroundColor: colors.cardBg, borderRadius: 12, paddingVertical: 14, alignItems: 'center', ...shadow('#000', 1, 0.06, 4), elevation: 2, borderWidth: 1, borderColor: colors.border },
   summaryValue: { fontSize: 20, fontWeight: '800', color: colors.textPrimary },
   summaryLabel: { fontSize: 10, fontWeight: '600', color: colors.textSecondary, marginTop: 2 },
-  summarySubLabel: { fontSize: 9, fontWeight: '700', marginTop: 1 },
+  summarySubLabel: { fontSize: 9, fontWeight: '700', color: colors.textSecondary, marginTop: 1 },
   tabCount: {
     fontSize: 11, fontWeight: '600',
     color: 'rgba(255,255,255,0.45)',
