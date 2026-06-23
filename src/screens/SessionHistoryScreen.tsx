@@ -582,7 +582,12 @@ export default function SessionHistoryScreen({ navigation }: Props) {
               </View>
             ) : (
               <>
-                {(sortKey === 'newest' || sortKey === 'oldest') ? (
+                {/* Date-bucket headers (Today / Yesterday / This week ...) only
+                    appear on the pristine default view. As soon as the user
+                    picks any sort, filter, domain, or range, switch to a flat
+                    globally-sorted list so the chosen order isn't undermined
+                    by buckets and the UI signals "you are in a custom view". */}
+                {!userFiltersActive ? (
                   groupByDateBucket(finalList).map(group => (
                     <View key={group.bucket} style={styles.groupSection}>
                       <Text style={styles.groupHeader}>{group.bucket}</Text>
