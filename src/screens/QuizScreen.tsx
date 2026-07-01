@@ -14,7 +14,7 @@ import {
   Share,
   Animated,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { RootStackParamList, HistoryEntry, Question, OptionState } from '../constants/types';
@@ -44,6 +44,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Quiz'>;
 export default function QuizScreen({ navigation, route }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
   const { notesMap, saveNote } = useNotes();
 
   const { config } = route.params;
@@ -740,7 +741,7 @@ export default function QuizScreen({ navigation, route }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       {/* ── Top Header ── */}
       <View style={styles.header}>
         <Text style={styles.headerTitle} numberOfLines={1}>
@@ -965,11 +966,14 @@ export default function QuizScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         )}
 
-        <View style={{ height: 110 }} />
+        <View style={{ height: 110 + insets.bottom }} />
       </ScrollView>
 
       {/* ── Bottom Navigation ── */}
-      <View style={styles.bottomNav}>
+      {/* Explicit paddingBottom keeps the row above Android gesture bar / iOS home
+          indicator even when the parent SafeAreaView reports 0 (edge-to-edge, PWA,
+          rotation transitions). Base padding stays 12; inset stacks on top. */}
+      <View style={[styles.bottomNav, { paddingBottom: 12 + insets.bottom }]}>
         {/* Previous */}
         <TouchableOpacity
           style={[styles.navBtn, !canGoPrev && styles.navBtnDisabled]}

@@ -7,7 +7,7 @@ import {
   StyleSheet,
   Share,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as Haptics from 'expo-haptics';
 
@@ -23,6 +23,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ExamResult'>;
 export default function ExamResultScreen({ navigation }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
 
   const stored = getExamResult();
   const history = stored?.history ?? [];
@@ -119,7 +120,7 @@ export default function ExamResultScreen({ navigation }: Props) {
   const isPerfect = percentage === 100;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       {/* ── Header ── */}
       <View style={styles.header}>
         <View style={{ width: 44 }} />
@@ -228,7 +229,9 @@ export default function ExamResultScreen({ navigation }: Props) {
       </ScrollView>
 
       {/* ── Fixed Footer ── */}
-      <View style={styles.footer}>
+      {/* Explicit paddingBottom keeps action row above Android gesture bar / iOS
+          home indicator even when parent SafeAreaView reports 0. */}
+      <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
         <TouchableOpacity
           style={[styles.homeBtn, styles.footerBtnHalf]}
           onPress={() => navigation.navigate('Main')}

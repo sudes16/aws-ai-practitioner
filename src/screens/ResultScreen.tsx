@@ -7,7 +7,7 @@ import {
   StyleSheet,
   Share,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as Haptics from 'expo-haptics';
 import { RootStackParamList, HistoryEntry, PASS_THRESHOLD_PCT } from '../constants/types';
@@ -88,6 +88,7 @@ export default function ResultScreen({ navigation, route }: Props) {
   const { history, total, score, quit, config } = route.params;
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
 
   const answered     = history.length;
   const pct          = quit
@@ -165,7 +166,7 @@ export default function ResultScreen({ navigation, route }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       {/* Header */}
       <View style={styles.header}>
         <View style={{ width: 36 }} />
@@ -271,9 +272,11 @@ export default function ResultScreen({ navigation, route }: Props) {
       </ScrollView>
 
       {/* ── Pinned footer ── */}
+      {/* Per-button paddingBottom keeps the 50/50 color split flush to the physical
+          device edge, above Android gesture bar / iOS home indicator. */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.footerBtn, styles.footerBtnHome, styles.footerBtnHalf]}
+          style={[styles.footerBtn, styles.footerBtnHome, styles.footerBtnHalf, { paddingBottom: 18 + insets.bottom }]}
           onPress={() => navigation.replace('Main')}
         >
           <Text style={styles.footerBtnHomeText}>✕ Close</Text>
@@ -284,6 +287,7 @@ export default function ResultScreen({ navigation, route }: Props) {
             styles.footerBtnReview,
             styles.footerBtnHalf,
             answered === 0 && styles.footerBtnDisabled,
+            { paddingBottom: 18 + insets.bottom },
           ]}
           disabled={answered === 0}
           onPress={() => {

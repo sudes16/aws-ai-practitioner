@@ -16,7 +16,7 @@ import {
   Platform,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList, DomainFilter, DOMAIN_LABELS, QuizMode } from '../constants/types';
@@ -42,6 +42,7 @@ export default function HomeScreen({ navigation }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const shared = useMemo(() => SHARED_STYLES(colors), [colors]);
+  const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
 
   // Fresh questions on every mount/render
@@ -541,7 +542,7 @@ export default function HomeScreen({ navigation }: Props) {
               </TouchableOpacity>
             </View>
           </View>
-          <View style={{ height: 100 }} />
+          <View style={{ height: 100 + insets.bottom }} />
         </ScrollView>
       );
     } else {
@@ -591,14 +592,14 @@ export default function HomeScreen({ navigation }: Props) {
               {'\n'}No answer feedback is shown until the exam is submitted.
             </Text>
           </View>
-          <View style={{ height: 100 }} />
+          <View style={{ height: 100 + insets.bottom }} />
         </ScrollView>
       );
     }
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       {/* Header */}
       <View style={styles.headerWrap}>
         <View style={styles.header}>
@@ -707,7 +708,9 @@ export default function HomeScreen({ navigation }: Props) {
       </View>
 
       {/* Start Button */}
-      <View style={styles.startWrap}>
+      {/* Explicit bottom offset keeps the button above Android gesture bar / iOS
+          home indicator even when the parent SafeAreaView reports 0. */}
+      <View style={[styles.startWrap, { bottom: 20 + insets.bottom }]}>
         <TouchableOpacity
           activeOpacity={0.7}
           style={[styles.startBtn, (loading || (appMode === 'practice' && poolSize === 0)) && styles.startBtnDisabled]}
