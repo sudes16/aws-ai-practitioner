@@ -651,10 +651,12 @@ export default function HomeScreen({ navigation }: Props) {
           label = '📝 Awaiting result — tap to update';
           color = colors.awsOrange;
         }
+        const hours = new Date().getHours();
+        const greeting = hours < 12 ? '🌅 Good morning' : hours < 17 ? '☀️ Good afternoon' : '🌙 Good evening';
         return (
           <View style={styles.countdownBanner}>
             <Text style={styles.countdownName} numberOfLines={1}>
-              {new Date().getHours() < 12 ? '🌅 Good morning' : '☀️ Good afternoon'}{', '}{profile.name}{'!'}
+              {greeting}{', '}{profile.name}{'!'}
             </Text>
             <View style={styles.countdownLabelWrap}>
               <ScrollView
