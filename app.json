@@ -6,17 +6,20 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#1A2B4C"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
     "plugins": [
       "expo-notifications",
       "expo-asset",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#1A2B4C"
+        }
+      ],
       [
         "expo-build-properties",
         {
@@ -31,7 +34,6 @@
       ],
       "expo-font",
       "@react-native-community/datetimepicker",
-      "expo-splash-screen",
       "expo-status-bar"
     ],
     "ios": {
