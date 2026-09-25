@@ -2,7 +2,7 @@
   "expo": {
     "name": "AWS AI Practitioner Prep",
     "slug": "aws-ai-practitioner-quiz",
-    "version": "3.0.0",
+    "version": "3.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -49,7 +49,7 @@
         "backgroundColor": "#1A2B4C"
       },
       "package": "com.awsquiz.aifpractitioner",
-      "versionCode": 15,
+      "versionCode": 16,
       "permissions": [
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",

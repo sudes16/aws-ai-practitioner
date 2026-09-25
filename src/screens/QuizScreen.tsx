@@ -185,8 +185,10 @@ export default function QuizScreen({ navigation, route }: Props) {
 
         if (isCorrect) {
           setScore(s => s + 1);
+          addMasteredQuestions([q.number]);
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         } else {
+          removeMasteredQuestions([q.number]);
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         }
 
@@ -241,8 +243,10 @@ export default function QuizScreen({ navigation, route }: Props) {
       setHistory(prev => [...prev, entry]);
       if (isCorrect === true) {
         setScore(s => s + 1);
+        addMasteredQuestions([q.number]);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else if (isCorrect === false || forced) {
+        removeMasteredQuestions([q.number]);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
 
