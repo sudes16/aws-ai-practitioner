@@ -2,7 +2,7 @@
   "expo": {
     "name": "AWS AI Practitioner Prep",
     "slug": "aws-ai-practitioner-quiz",
-    "version": "2.1.2",
+    "version": "3.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -21,13 +21,14 @@
         "expo-build-properties",
         {
           "android": {
-            "compileSdkVersion": 35,
-            "targetSdkVersion": 35,
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
             "buildToolsVersion": "35.0.0"
           }
         }
       ],
-      "expo-font"
+      "expo-font",
+      "@react-native-community/datetimepicker"
     ],
     "ios": {
       "supportsTablet": true,
@@ -42,7 +43,7 @@
         "backgroundColor": "#1A2B4C"
       },
       "package": "com.awsquiz.aifpractitioner",
-      "versionCode": 14,
+      "versionCode": 15,
       "permissions": [
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",
