@@ -1,6 +1,6 @@
 # AWS AI Practitioner Quiz App — Code Review
 
-**Platform:** React Native + Expo SDK 52 / TypeScript 5.3.3  
+**Platform:** React Native + Expo SDK 57 / TypeScript 6.0.3
 **Review Date Range:** May 20–29, 2026  
 **Reviewer:** GitHub Copilot (Claude Sonnet 4.6)  
 **Type:** Iterative static analysis — 5 passes — single source of truth

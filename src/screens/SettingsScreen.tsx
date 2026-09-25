@@ -85,6 +85,7 @@ export default function SettingsScreen({ navigation }: Props) {
   const buildNumber = Platform.OS === 'android' ? Constants.expoConfig?.android?.versionCode : Constants.expoConfig?.ios?.buildNumber;
   const fullVersionString = buildNumber ? `${appVersion} (Build ${buildNumber})` : appVersion;
   const packageId = Constants.expoConfig?.android?.package ?? 'com.awsquiz.aifpractitioner';
+  const sdkVersion = Constants.expoConfig?.sdkVersion ?? '57';
 
   useFocusEffect(
     React.useCallback(() => {
@@ -771,7 +772,7 @@ export default function SettingsScreen({ navigation }: Props) {
           <View style={styles.rowDivider} />
           <View style={styles.aboutRow}>
             <Text style={styles.aboutKey}>Platform</Text>
-            <Text style={styles.aboutVal}>Expo SDK 52 | React Native</Text>
+            <Text style={styles.aboutVal}>Expo SDK {sdkVersion} | React Native</Text>
           </View>
           <View style={styles.rowDivider} />
           <View style={styles.aboutRow}>
