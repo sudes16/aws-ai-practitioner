@@ -1,6 +1,6 @@
 {
   "name": "aws-ai-practitioner-quiz",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "main": "index.js",
   "scripts": {
     "start": "node node_modules/expo/bin/cli start",
@@ -32,6 +32,7 @@
     "react-native": "0.86.3",
     "react-native-chart-kit": "^6.12.2",
     "react-native-gesture-handler": "~2.32.0",
+    "react-native-google-mobile-ads": "^17.4.0",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
     "react-native-svg": "15.15.4",

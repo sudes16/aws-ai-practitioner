@@ -25,6 +25,7 @@ import { getMasteredQuestions } from '../utils/storage';
 import { getProfile, saveProfile, getDaysLeft, UserProfile, validateProfileInputs, getPostExamPromptState, setPostExamPromptDismissed, setPostExamPromptLater, markExamPassed } from '../utils/profileStore';
 import { scheduleExamCountdownNotifications } from '../utils/notificationService';
 import { useTheme } from '../contexts/ThemeContext';
+import { BannerAdComponent } from '../components/BannerAdComponent';
 import { ColorScheme } from '../constants/colors';
 import { cssVal, shadow, SHARED_STYLES } from '../utils/styleUtils';
 import { toLocalDateKey } from '../utils/dateUtils';
@@ -542,6 +543,7 @@ export default function HomeScreen({ navigation }: Props) {
               </TouchableOpacity>
             </View>
           </View>
+          <BannerAdComponent />
           <View style={{ height: 100 + insets.bottom }} />
         </ScrollView>
       );
@@ -592,6 +594,7 @@ export default function HomeScreen({ navigation }: Props) {
               {'\n'}No answer feedback is shown until the exam is submitted.
             </Text>
           </View>
+          <BannerAdComponent />
           <View style={{ height: 100 + insets.bottom }} />
         </ScrollView>
       );

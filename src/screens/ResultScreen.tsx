@@ -12,6 +12,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as Haptics from 'expo-haptics';
 import { RootStackParamList, HistoryEntry, PASS_THRESHOLD_PCT } from '../constants/types';
 import { useTheme } from '../contexts/ThemeContext';
+import { BannerAdComponent } from '../components/BannerAdComponent';
 import { shadow } from '../utils/styleUtils';
 import { ColorScheme } from '../constants/colors';
 import { addMasteredQuestions, removeMasteredQuestions, addScoreSession, saveSessionRecord } from '../utils/storage';
@@ -268,6 +269,7 @@ export default function ResultScreen({ navigation, route }: Props) {
           )}
         </View>
 
+        <BannerAdComponent />
         <View style={{ height: 20 }} />
       </ScrollView>
 
